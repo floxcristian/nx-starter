@@ -94,5 +94,5 @@ pnpm create-nx-workspace@latest nx-starter
 - **Unit test:** Jest
 - **E2E test runner:** Playwright
 - **CI Provider:** Github Actions
-  nx g @nx/nest:app apps/users-api
-  nx g @nx/nest:app apps/orders-api
+  nx g @nx/nest:app apps/api-users
+  nx g @nx/nest:app apps/api-orders
