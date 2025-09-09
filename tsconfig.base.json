@@ -14,7 +14,10 @@
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
-    "paths": {}
+    "paths": {
+      "@nx-starter/orders-domain": ["libs/orders-domain/src/index.ts"],
+      "@nx-starter/users-domain": ["libs/users-domain/src/index.ts"]
+    }
   },
   "exclude": ["node_modules", "tmp"]
 }

@@ -80,7 +80,7 @@ And join the Nx community:
 - [Our Youtube channel](https://www.youtube.com/@nxdevtools)
 - [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
 
-# Steps
+# Creación
 
 ## Paso 1: Crear el workspace inicial
 
@@ -104,7 +104,7 @@ pnpm create-nx-workspace@latest nx-starter
 
 ## Paso 2: Configurar pnpm workspace
 
-- Añadir al archivo `pnpm-workspace.yaml` el siguiente código:
+- Añadir al archivo `pnpm-workspace.yaml`:
 
 ```yaml
 packages:
@@ -122,15 +122,14 @@ nx add @nx/nest
 
 # Generar las APIs
 
-nx g @nx/nest:app apps/users-api
-nx g @nx/nest:app apps/orders-api
+nx g @nx/nest:app apps/api-users
+nx g @nx/nest:app apps/api-orders
 
 # Generar las librerías de dominio
 
-nx g @nx/nest:lib users-domain --directory=libs/users-domain --buildable
-nx g @nx/nest:lib orders-domain --directory=libs/orders-domain --buildable
-nx g @nx/nest:lib libs/shared/config --name=shared-config --buildable
+nx g @nx/nest:lib --name=users-domain --directory=libs/users-domain --buildable
+nx g @nx/nest:lib --name=orders-domain --directory=libs/orders-domain --buildable
 
 # Generar librería compartida para UI
 
-nx g @nx/angular:lib shared-ui --directory=libs/shared-ui --buildable --no-interactive
+nx g @nx/angular:lib --name=shared-ui --directory=libs/shared-ui --buildable
