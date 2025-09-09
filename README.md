@@ -82,8 +82,13 @@ And join the Nx community:
 
 # Steps
 
+## Paso 1: Crear el workspace inicial
+
+```bash
 pnpm create-nx-workspace@latest nx-starter
-**Configuraciones seleccionadas:**
+```
+
+**Seleccionar en la GUI:**
 
 - **Preset:** Angular
 - **Integrated monorepo or standalone project:** integrated
@@ -96,3 +101,36 @@ pnpm create-nx-workspace@latest nx-starter
 - **CI Provider:** Github Actions
   nx g @nx/nest:app apps/api-users
   nx g @nx/nest:app apps/api-orders
+
+## Paso 2: Configurar pnpm workspace
+
+- Añadir al archivo `pnpm-workspace.yaml` el siguiente código:
+
+```yaml
+packages:
+  - 'apps/*'
+  - 'libs/*'
+```
+
+## Paso 3: Instalar plugins y generar aplicaciones
+
+- Instalar plugin de NestJS
+
+```bash
+nx add @nx/nest
+```
+
+# Generar las APIs
+
+nx g @nx/nest:app apps/users-api
+nx g @nx/nest:app apps/orders-api
+
+# Generar las librerías de dominio
+
+nx g @nx/nest:lib users-domain --directory=libs/users-domain --buildable
+nx g @nx/nest:lib orders-domain --directory=libs/orders-domain --buildable
+nx g @nx/nest:lib libs/shared/config --name=shared-config --buildable
+
+# Generar librería compartida para UI
+
+nx g @nx/angular:lib shared-ui --directory=libs/shared-ui --buildable --no-interactive

@@ -1,2 +1,5 @@
 autoInstallPeers: true
 strictPeerDependencies: false
+packages:
+  - 'apps/*'
+  - 'libs/*'
