@@ -1,10 +1,9 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { OrdersDomainModule } from '@nx-starter/orders-domain';
 
 @Module({
-  imports: [],
-  controllers: [AppController],
-  providers: [AppService],
+  imports: [OrdersDomainModule], // Solo importar el módulo del dominio
+  controllers: [], // No controllers propios
+  providers: [], // No providers propios
 })
 export class AppModule {}

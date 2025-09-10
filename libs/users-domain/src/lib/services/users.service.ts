@@ -3,13 +3,8 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { AuthService } from '../auth/auth.service';
-import {
-  CreateUserDto,
-  UserEntity,
-  LoginDto,
-  AuthResponse,
-} from '../entities/user.entity';
+import { AuthService } from './auth.service';
+import { CreateUserDto, UserEntity } from '../entities/user.entity';
 
 @Injectable()
 export class UsersService {
@@ -17,68 +12,55 @@ export class UsersService {
   private currentId = 1;
 
   constructor(private authService: AuthService) {
-    // Crear usuario demo
     this.createDemoUser();
   }
 
   private async createDemoUser() {
-    const demoUser: CreateUserDto = {
+    const hashedPassword = await this.authService.hashPassword('password123');
+
+    const demo = new UserEntity({
+      id: '1',
       name: 'Admin Demo',
       email: 'admin@demo.com',
-      password: 'password123',
       phone: '+56912345678',
-    };
+      password: hashedPassword,
+      createdAt: new Date(),
+    });
 
-    try {
-      await this.createUser(demoUser);
-    } catch (error) {
-      // Usuario ya existe, ignorar
-    }
+    this.users.push(demo);
+    this.currentId = 2;
   }
 
-  async createUser(createUserDto: CreateUserDto): Promise<UserEntity> {
-    // Verificar si el email ya existe
-    const existingUser = this.users.find(
-      (u) => u.email === createUserDto.email
-    );
-    if (existingUser) {
-      throw new ConflictException('El email ya está en uso');
+  async createUser(dto: CreateUserDto): Promise<UserEntity> {
+    const exists = this.users.find((u) => u.email === dto.email);
+    if (exists) {
+      throw new ConflictException('Email ya existe');
     }
 
-    const hashedPassword = await this.authService.hashPassword(
-      createUserDto.password
-    );
+    const hashedPassword = await this.authService.hashPassword(dto.password);
 
     const user = new UserEntity({
       id: this.currentId.toString(),
-      name: createUserDto.name,
-      email: createUserDto.email,
-      phone: createUserDto.phone,
+      name: dto.name,
+      email: dto.email,
+      phone: dto.phone,
       password: hashedPassword,
       createdAt: new Date(),
-      updatedAt: new Date(),
     });
 
     this.users.push(user);
     this.currentId++;
 
-    // Devolver usuario sin password
     const { password, ...userWithoutPassword } = user;
     return userWithoutPassword as UserEntity;
   }
 
   async findAll(): Promise<UserEntity[]> {
-    return this.users.map((user) => {
-      const { password, ...userWithoutPassword } = user;
-      return userWithoutPassword as UserEntity;
-    });
+    return this.users.map(({ password, ...user }) => user as UserEntity);
   }
 
   async findByEmail(email: string): Promise<UserEntity | null> {
-    const user = this.users.find((u) => u.email === email);
-    if (!user) return null;
-
-    return user; // Devolver con password para validación
+    return this.users.find((u) => u.email === email) || null;
   }
 
   async findById(id: string): Promise<UserEntity | null> {
@@ -87,25 +69,5 @@ export class UsersService {
 
     const { password, ...userWithoutPassword } = user;
     return userWithoutPassword as UserEntity;
-  }
-
-  async login(loginDto: LoginDto): Promise<AuthResponse> {
-    const user = await this.findByEmail(loginDto.email);
-    if (!user) {
-      throw new NotFoundException('Usuario no encontrado');
-    }
-
-    return this.authService.login(loginDto, user);
-  }
-
-  async getUserStats() {
-    return {
-      totalUsers: this.users.length,
-      recentUsers: this.users.filter((u) => {
-        const dayAgo = new Date();
-        dayAgo.setDate(dayAgo.getDate() - 1);
-        return u.createdAt > dayAgo;
-      }).length,
-    };
   }
 }
