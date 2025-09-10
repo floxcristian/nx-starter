@@ -8,7 +8,8 @@ import { UsersService } from './services/users.service';
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'dev-secret-key-change-in-production',
+      secret:
+        process.env['JWT_SECRET'] || 'dev-secret-key-change-in-production',
       signOptions: {
         expiresIn: '24h',
         issuer: 'core-api',

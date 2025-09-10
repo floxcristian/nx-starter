@@ -133,3 +133,10 @@ nx g @nx/nest:lib --name=orders-domain --directory=libs/orders-domain --buildabl
 # Generar librería compartida para UI
 
 nx g @nx/angular:lib --name=shared-ui --directory=libs/shared-ui --buildable
+
+# Instalar dependencias
+
+- Instalar dependencias compartidas:
+  pnpm add class-validator class-transformer @nestjs/swagger -w
+
+- Instalar dependencias específicas de:
