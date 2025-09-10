@@ -34,16 +34,18 @@ COPY libs/users-domain/package.json ./libs/users-domain/
 COPY tsconfig.base.json nx.json ./
 
 # Instalar dependencias con cache mount para optimización
+# Para el build stage necesitamos todas las dependencias
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-    pnpm install --filter ${APP_NAME} --filter libs/users-domain --frozen-lockfile
+    pnpm install --frozen-lockfile
 
 # Copiar código fuente
 COPY libs/users-domain ./libs/users-domain
 COPY apps/${APP_NAME}/ ./apps/${APP_NAME}/
 
-# Build de la aplicación
-RUN pnpm nx build users-domain
-RUN pnpm nx build ${APP_NAME}
+# Build de la aplicación usando pnpm exec
+RUN pnpm exec nx build users-domain
+RUN pnpm exec nx build ${APP_NAME}
+
 
 ###################
 # PRODUCTION DEPS
@@ -54,8 +56,7 @@ ARG APP_NAME=api-users
 
 # Copiar archivos de configuración del workspace para dependencias
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
-COPY apps/${APP_NAME}/package.json ./apps/${APP_NAME}/
-
+COPY libs/users-domain/package.json ./libs/users-domain/
 
 # Instalar SOLO dependencias de producción con cache
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
@@ -85,10 +86,10 @@ RUN adduser -S nestjs -u 1001
 WORKDIR /usr/src/app
 
 # Copiar dependencias de producción
-COPY --from=deps --chown=nestjs:nodejs /usr/src/app/node_modules ./node_modules
+COPY --from=production-deps --chown=nestjs:nodejs /usr/src/app/node_modules ./node_modules
 
 # Copiar build compilado (ya JavaScript, no necesita tsconfig)
-COPY --from=builder --chown=nestjs:nodejs /usr/src/app/dist/apps/${APP_NAME} ./dist
+COPY --from=build --chown=nestjs:nodejs /usr/src/app/dist/apps/${APP_NAME} ./dist
 
 
 # Exponer puerto
@@ -101,7 +102,8 @@ USER nestjs
 ENTRYPOINT ["dumb-init", "--"]
 
 # Comando para ejecutar la aplicación
-CMD ["node", "dist/apps/api-users/main"]
+#CMD ["node", "dist/apps/api-users/main"]
+CMD ["node", "dist/main.js"]
 
 ###################
 # DEVELOPMENT
