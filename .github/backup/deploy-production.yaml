@@ -1,0 +1,110 @@
+# Workflow para CI/CD de microservicios en GCP Multi-País - PRODUCCIÓN
+name: Build, Push, and Deploy APIs to Cloud Run
+
+# Se ejecuta en push a main
+on:
+  push:
+    branches: [main] # Deploy automático cuando se hace push a main
+  workflow_dispatch: # Permite ejecución manual para deploys específicos
+    inputs:
+      target_service:
+        description: 'Service to deploy (front-admin, api-users, api-orders or all)'
+        required: true
+        default: 'all'
+        type: choice # 'choice' crea un menú desplegable, es más amigable
+        options:
+          - all
+          - api-users
+          - api-orders
+          # - front-admin # Pendiente de habilitar cuando esté listo el front-admin
+
+env:
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }} # ID del proyecto en GCP (ej: sleepr-chile-463202)
+  GAR_LOCATION: ${{ secrets.GCP_REGION }}-docker.pkg.dev # Región del Artifact Registry (ej: southamerica-west1-docker.pkg.dev)
+  GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }} # Nombre del repositorio en Artifact Registry (ej: mi-monorepo-repo)
+
+jobs:
+  # Job principal que maneja build, push y deploy de todas las imágenes
+  build-push-and-deploy:
+    name: Deploy ${{ matrix.service.name }}
+    runs-on: ubuntu-latest
+
+    # Configuración de environment (necesario para acceder a secrets y protecciones de producción)
+    environment:
+      name: production-chile
+
+    # Permisos necesarios para autenticación con GCP usando Workload Identity
+    permissions:
+      contents: read # Permiso para leer código del repositorio
+      id-token: write # Permiso para escribir tokens OIDC (requerido para Workload Identity Federation)
+
+    # Filtrar servicios si es ejecución manual.
+    # - Si el evento es un 'push', SIEMPRE se ejecuta (github.event_name == 'push').
+    # - Si es manual ('workflow_dispatch'), solo se ejecuta si la opción es 'all' O si el nombre del servicio de la matriz coincide con la opción seleccionada.
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (inputs.service == 'all' || inputs.service == matrix.service.name))
+
+    strategy:
+      matrix:
+        service:
+          - name: api-users
+            port: 3001
+          - name: api-orders
+            port: 3002
+
+    steps:
+      # Step 1: Descargar código del repositorio
+      - name: Checkout Repository
+        uses: actions/checkout@v4 # Action oficial de GitHub para clonar el repo
+
+      # Step 2: Autenticación con Google Cloud usando Workload Identity Federation
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2 # Action oficial de Google
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }} # Provider específico configurado en environment secret
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }} # Service Account con permisos mínimos necesarios
+
+      # Step 3: Configurar Google Cloud SDK (comando gcloud)
+      - name: Set up Cloud SDK and Authorize Docker
+        uses: google-github-actions/setup-gcloud@v2 # Instala y configura gcloud CLI
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      # Step 4: Construir imagen Docker para cada microservicio
+      # Comando docker build explicado:
+      # -t: tag/nombre de la imagen final
+      # ${{ vars.GAR_LOCATION }}: registry específico (ej: southamerica-west1-docker.pkg.dev)
+      # ${{ vars.GCP_PROJECT_ID }}: project ID específico (ej: sleepr-chile-463202)
+      # ${{ matrix.service }}: nombre del servicio (ej: auth, reservation)
+      # ${{ github.sha }}: commit hash para versionado
+      # -f: path al Dockerfile específico del servicio
+      # .: contexto de build (directorio raíz del proyecto)
+      - name: Build and Push Docker Image
+        id: build-image
+        run: |
+          IMAGE_BASE_NAME="${{ env.GAR_LOCATION }}/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ matrix.service.name }}"
+          IMAGE_SHA_TAG="$IMAGE_BASE_NAME:${{ github.sha }}"
+          IMAGE_LATEST_TAG="$IMAGE_BASE_NAME:latest"
+
+          docker build \
+            --target production \
+            -t "$IMAGE_SHA_TAG" \
+            -t "$IMAGE_LATEST_TAG" \
+            --build-arg APP_NAME=${{ matrix.service.name }} \
+            --build-arg APP_PORT=${{ matrix.service.port }}
+            .
+
+      # Step 8: Subir imagen a Artifact Registry (solo en push a main o workflow_dispatch)
+      # Solo se ejecuta cuando es push directo a main o ejecución manual, no en Pull Requests
+      - name: Push Docker image
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          docker push ${{ vars.REGISTRY }}/${{ vars.PROJECT_ID }}/${{ matrix.service }}/production:${{ github.sha }}
+          docker push ${{ vars.REGISTRY }}/${{ vars.PROJECT_ID }}/${{ matrix.service }}/production:latest
+
+      # Step 9: Verificar que el deploy fue exitoso (solo en push a main o workflow_dispatch)
+      # Lista la imagen más reciente para confirmar que se subió correctamente
+      - name: Verify deployment
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          echo "Successfully deployed ${{ matrix.service }} to Artifact Registry"
+          gcloud artifacts docker images list ${{ vars.REGISTRY }}/${{ vars.PROJECT_ID }}/${{ matrix.service }} --limit=1
