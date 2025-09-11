@@ -139,4 +139,10 @@ nx g @nx/angular:lib --name=shared-ui --directory=libs/shared-ui --buildable
 - Instalar dependencias compartidas:
   pnpm add class-validator class-transformer @nestjs/swagger -w
 
-- Instalar dependencias específicas de:
+- Instalar dependencias específicas de una librería:
+  pnpm add bcryptjs --filter @nx-starter/users-domain
+  "@nestjs/jwt": "^11.0.0",
+  "@nestjs/passport": "^11.0.5",
+  "bcryptjs": "^3.0.2"
+
+  pnpm add @nestjs/jwt @nestjs/passport bcryptjs --filter @nx-starter/users-domain

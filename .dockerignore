@@ -1,0 +1,45 @@
+# Dependencies
+**/node_modules
+**/npm-debug.log*
+**/pnpm-debug.log*
+
+# Nx Cache
+.nx/cache
+
+# Angular Cache
+.angular/cache
+
+# Build outputs
+dist
+build
+.next
+coverage
+
+# Development files
+.git
+.gitignore
+README.md
+*.md
+.env*
+.DS_Store
+
+# Test files
+# Excluidos por defecto para mantener la imagen de producción limpia.
+**/*.spec.ts
+**/*.test.ts
+
+# Docker files
+# Excluimos los propios archivos de Docker para no incluirlos en la imagen.
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+logs
+*.log
