@@ -55,7 +55,10 @@ jobs:
 
           JSON_MATRIX="{\"include\":["
           for app in $AFFECTED_APPS; do
-            port=$(npx nx show project $app --json | jq -r ".targets.serve.options.port // 3000")
+            echo "Processing affected app: $app"
+            # --- LÍNEA CORREGIDA ---
+            # Se añade '2>/dev/null' para ignorar warnings (stderr) y 'grep' para asegurar que solo el JSON se pasa a jq.
+            port=$(npx nx show project $app --json 2>/dev/null | grep '^{' | jq -r ".targets.serve.options.port // 3000")
             JSON_MATRIX+=$(jq -n --arg name "$app" --argjson port "$port" '{"name":$name,"port":$port}')
             JSON_MATRIX+=","
           done
@@ -107,4 +110,19 @@ jobs:
             -t "$IMAGE_SHA_TAG" \
             -t "$IMAGE_LATEST_TAG" \
             --build-arg APP_NAME=${{ matrix.service.name }} \
-            --build
+            --build-arg APP_PORT=${{ matrix.service.port }}
+
+          docker push "$IMAGE_SHA_TAG"
+          docker push "$IMAGE_LATEST_TAG"
+
+          echo "image_sha_tag=$IMAGE_SHA_TAG" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Google Cloud Run
+        run: |
+          gcloud run deploy ${{ matrix.service.name }} \
+            --image ${{ steps.build-image.outputs.image_sha_tag }} \
+            --region ${{ env.GCP_REGION }} \
+            --port ${{ matrix.service.port }} \
+            --allow-unauthenticated \
+            --platform managed \
+            --quiet
