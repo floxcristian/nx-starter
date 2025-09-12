@@ -18,7 +18,8 @@
     "docker:api-orders": "docker build . --target production -t api-orders --build-arg APP_NAME=api-orders --build-arg APP_PORT=3002",
     "test:all": "nx run-many --target=test --all",
     "lint:all": "nx run-many -t=lint --all --parallel",
-    "lint:fix": "nx run-many -t=lint --all --parallel --fix"
+    "lint:fix": "nx run-many -t=lint --all --parallel --fix",
+    "gcp:setup": "bash ./tools/scripts/setup-gcp.sh"
   },
   "private": true,
   "dependencies": {

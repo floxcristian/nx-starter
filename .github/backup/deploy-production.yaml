@@ -3,12 +3,14 @@ name: Build, Push, and Deploy APIs to Cloud Run
 
 # Se ejecuta en push a main
 on:
+  # Trigger Automático: En cada push a la rama 'main'
   push:
-    branches: [main] # Deploy automático cuando se hace push a main
-  workflow_dispatch: # Permite ejecución manual para deploys específicos
+    branches: [main]
+  # Trigger Manual: Permite ejecutarlo desde la UI de GitHub Actions (permite deploys específicos)
+  workflow_dispatch:
     inputs:
       target_service:
-        description: 'Service to deploy (front-admin, api-users, api-orders or all)'
+        description: 'Service to deploy'
         required: true
         default: 'all'
         type: choice # 'choice' crea un menú desplegable, es más amigable
@@ -20,7 +22,8 @@ on:
 
 env:
   GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }} # ID del proyecto en GCP (ej: sleepr-chile-463202)
-  GAR_LOCATION: ${{ secrets.GCP_REGION }}-docker.pkg.dev # Región del Artifact Registry (ej: southamerica-west1-docker.pkg.dev)
+  GCP_REGION: ${{ vars.GCP_REGION }} # Región donde se desplegarán los servicios (ej: southamerica-west1)
+  GAR_LOCATION: ${{ vars.GCP_REGION }}-docker.pkg.dev # Región del Artifact Registry (ej: southamerica-west1-docker.pkg.dev)
   GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }} # Nombre del repositorio en Artifact Registry (ej: mi-monorepo-repo)
 
 jobs:
@@ -31,7 +34,7 @@ jobs:
 
     # Configuración de environment (necesario para acceder a secrets y protecciones de producción)
     environment:
-      name: production-chile
+      name: production # Nombre del environment en GitHub
 
     # Permisos necesarios para autenticación con GCP usando Workload Identity
     permissions:
