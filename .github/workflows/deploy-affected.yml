@@ -19,15 +19,13 @@ jobs:
     name: Determine Affected Services
     runs-on: ubuntu-latest
     outputs:
-      # El output será un string JSON que la siguiente matriz puede leer
       affected_matrix: ${{ steps.get-affected.outputs.affected_matrix }}
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          # fetch-depth: 0 es crucial para que Nx pueda comparar el commit actual con el de 'main'
-          fetch-depth: 0
+          fetch-depth: 0 # Crucial para que Nx pueda comparar commits
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v2
@@ -41,31 +39,26 @@ jobs:
           cache: 'pnpm'
 
       - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+        # Añadimos --store-dir para evitar conflictos de permisos con .npmrc en el runner de CI
+        run: pnpm install --frozen-lockfile --store-dir ~/.pnpm/store
 
       - name: Get Affected Services and Build Matrix
         id: get-affected
         run: |
-          # 1. Obtenemos la lista de apps afectadas (ej: "api-users api-orders")
           AFFECTED_APPS=$(npx nx affected:apps --base=origin/main --head=HEAD --plain | tr '\n' ' ')
 
-          # 2. Si no hay apps afectadas, generamos un JSON array vacío
           if [ -z "$AFFECTED_APPS" ]; then
             echo "No applications were affected."
             echo "affected_matrix={\"include\":[]}" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # 3. Si hay apps, creamos un objeto JSON para cada una con su puerto
-          #    (Esto es avanzado: lee la configuración del puerto desde project.json)
           JSON_MATRIX="{\"include\":["
           for app in $AFFECTED_APPS; do
-            # Asumimos un puerto por defecto si no se encuentra
             port=$(npx nx show project $app --json | jq -r ".targets.serve.options.port // 3000")
             JSON_MATRIX+=$(jq -n --arg name "$app" --argjson port "$port" '{"name":$name,"port":$port}')
             JSON_MATRIX+=","
           done
-          # Quitamos la última coma y cerramos el JSON
           JSON_MATRIX=$(echo "$JSON_MATRIX" | sed 's/,$//')
           JSON_MATRIX+="]}"
 
@@ -85,7 +78,6 @@ jobs:
       id-token: 'write'
 
     strategy:
-      # La matriz ahora se genera dinámicamente con el output del job anterior
       matrix: ${{ fromJson(needs.determine-affected.outputs.affected_matrix) }}
 
     steps:
@@ -115,19 +107,4 @@ jobs:
             -t "$IMAGE_SHA_TAG" \
             -t "$IMAGE_LATEST_TAG" \
             --build-arg APP_NAME=${{ matrix.service.name }} \
-            --build-arg APP_PORT=${{ matrix.service.port }}
-
-          docker push "$IMAGE_SHA_TAG"
-          docker push "$IMAGE_LATEST_TAG"
-
-          echo "image_sha_tag=$IMAGE_SHA_TAG" >> $GITHUB_OUTPUT
-
-      - name: Deploy to Google Cloud Run
-        run: |
-          gcloud run deploy ${{ matrix.service.name }} \
-            --image ${{ steps.build-image.outputs.image_sha_tag }} \
-            --region ${{ env.GCP_REGION }} \
-            --port ${{ matrix.service.port }} \
-            --allow-unauthenticated \
-            --platform managed \
-            --quiet
+            --build
