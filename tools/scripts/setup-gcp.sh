@@ -9,11 +9,9 @@ set -e # Termina el script si un comando falla (mantenemos esto como red de segu
 GCP_PROJECT_ID=$(gcloud config get-value project)
 GITHUB_REPO="floxcristian/nx-starter"        # Formato: usuario/repositorio
 GITHUB_OWNER="floxcristian"                  # El dueño del repositorio (usuario u organización)
-
-# --- Nombres de Recursos (puedes personalizarlos) ---
-GCP_REGION="southamerica-west1"
-GAR_REPOSITORY="nx-starter"
-GCLOUD_SERVICE_ACCOUNT="nx-starter-gha-deployer"
+GCP_REGION="southamerica-west1" # Elige la misma región que usarás en el workflow
+GAR_REPOSITORY="nx-starter" # El nombre que tendrá tu repositorio de imágenes
+GCLOUD_SERVICE_ACCOUNT="nx-starter-gha-deployer" # El nombre para tu cuenta de servicio
 
 # --- Nombres para Workload Identity Federation (no tocar a menos que sepas lo que haces) ---
 GCLOUD_IDENTITY_POOL="github-pool"
