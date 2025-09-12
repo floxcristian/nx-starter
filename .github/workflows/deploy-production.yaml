@@ -1,7 +1,6 @@
 # Workflow para CI/CD de microservicios en GCP Multi-País - PRODUCCIÓN
 name: Build, Push, and Deploy APIs to Cloud Run
 
-# Se ejecuta en push a main o manualmente
 on:
   push:
     branches: [main]
@@ -20,25 +19,21 @@ on:
 env:
   GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
   GCP_REGION: ${{ vars.GCP_REGION }}
-  GAR_LOCATION: ${{ vars.GCP_REGION }}-docker.pkg.dev # Ubicación del Artifact Registry
-  GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }} # Nombre del repositorio de imágenes
+  GAR_LOCATION: ${{ vars.GCP_REGION }}-docker.pkg.dev
+  GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
 
 jobs:
   build-push-and-deploy:
     name: Deploy ${{ matrix.service.name }}
     runs-on: ubuntu-latest
-
-    # Define el entorno de GitHub para acceder a secrets de producción
     environment:
       name: production
-
-    # Permisos necesarios para la autenticación con GCP
     permissions:
       contents: read
       id-token: write
 
     strategy:
-      fail-fast: false # Opcional: si un job de la matriz falla, los otros continúan
+      fail-fast: false
       matrix:
         service:
           - name: api-users
@@ -59,12 +54,16 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       # 3. Configurar el SDK de Google Cloud
-      - name: Set up Cloud SDK and Authorize Docker
+      - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
-      # 4. Construir y subir la imagen Docker
+      # 4. Autorizar Docker para Artifact Registry (ESTA ES LA CORRECCIÓN)
+      - name: Configure Docker credentials
+        run: gcloud auth configure-docker ${{ env.GAR_LOCATION }} --quiet
+
+      # 5. Construir y subir la imagen Docker
       - name: Build and Push Docker Image
         if: github.event_name == 'push' || (github.event.inputs.target_service == 'all' || github.event.inputs.target_service == matrix.service.name)
         id: build-and-push
@@ -73,7 +72,6 @@ jobs:
           IMAGE_SHA_TAG="$IMAGE_BASE_NAME:${{ github.sha }}"
           IMAGE_LATEST_TAG="$IMAGE_BASE_NAME:latest"
 
-          # Construir la imagen
           docker build \
             --target production \
             -t "$IMAGE_SHA_TAG" \
@@ -82,32 +80,18 @@ jobs:
             --build-arg APP_PORT=${{ matrix.service.port }} \
             .
 
-          # Subir la imagen al Artifact Registry
           echo "Pushing image to Artifact Registry..."
           docker push "$IMAGE_SHA_TAG"
           docker push "$IMAGE_LATEST_TAG"
 
-          # Exportar el nombre de la imagen para usarlo en pasos posteriores
           echo "image_name=$IMAGE_SHA_TAG" >> $GITHUB_OUTPUT
 
-      # 5. Desplegar el servicio en Cloud Run
+      # 6. Desplegar el servicio en Cloud Run
       - name: Deploy to Cloud Run
-        if: steps.build-and-push.outcome == 'success' # Solo se ejecuta si el paso anterior fue exitoso
+        if: steps.build-and-push.outcome == 'success'
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: ${{ matrix.service.name }}
           region: ${{ env.GCP_REGION }}
           image: ${{ steps.build-and-push.outputs.image_name }}
-          # Opcional: permite tráfico no autenticado
           allow_unauthenticated: true
-          # Opcional: define variables de entorno para el servicio
-          # env_vars: |
-          #   NODE_ENV=production
-          #   LOG_LEVEL=info
-
-      # 6. Verificar que la imagen existe en el registro (Opcional)
-      - name: Verify image in Artifact Registry
-        if: steps.build-and-push.outcome == 'success'
-        run: |
-          echo "Successfully processed ${{ matrix.service.name }}. Verifying latest image..."
-          gcloud artifacts docker images list "${{ env.GAR_LOCATION }}/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ matrix.service.name }}" --limit=1 --sort-by=~UPDATE_TIME
