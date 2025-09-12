@@ -3,9 +3,6 @@ name: Build, Push, and Deploy APIs to Cloud Run
 
 # Se ejecuta en push a main o manualmente
 on:
-  # Trigger Automático: En cada push a la rama 'main'
-  push:
-    branches: [main]
   # Trigger Manual: Permite ejecutarlo desde la UI de GitHub Actions (permite deploys específicos)
   workflow_dispatch:
     inputs:
