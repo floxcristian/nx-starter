@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - master
 
 env:
   GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
@@ -25,8 +26,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          filter: tree:0
+          fetch-depth: 0 # Crucial para que Nx pueda comparar commits
+          filter: tree:0 # Optimización para un checkout más rápido
 
       # La acción oficial de Nx para calcular los SHAs de base y cabeza correctamente.
       - name: Set up Nx SHAs
@@ -60,17 +61,20 @@ jobs:
           fi
 
           echo "Affected applications: $AFFECTED_APPS"
-          JSON_MATRIX="{\"include\":["
+
+          # Lógica de construcción de JSON robusta
+          JSON_OBJECTS=""
           for app in $AFFECTED_APPS; do
             port=$(npx nx show project $app --json 2>/dev/null | grep '^{' | jq -r ".targets.serve.options.port // 3000")
             if [ -z "$port" ]; then
               port=3000
             fi
-            JSON_MATRIX+=$(jq -n --arg name "$app" --argjson port "$port" '{"name":$name,"port":$port}')
-            JSON_MATRIX+=","
+            # Generamos cada objeto JSON como una línea separada
+            JSON_OBJECTS+=$(jq -n --arg name "$app" --argjson port "$port" '{"name":$name,"port":$port}')
           done
-          JSON_MATRIX=$(echo "$JSON_MATRIX" | sed 's/,$//')
-          JSON_MATRIX+="]}"
+
+          # Usamos jq en modo 'slurp' (-s) para leer todos los objetos y meterlos en un array
+          JSON_MATRIX=$(echo "$JSON_OBJECTS" | jq -s '{"include": .}')
 
           echo "Affected matrix generated: $JSON_MATRIX"
           echo "affected_matrix=$JSON_MATRIX" >> $GITHUB_OUTPUT
