@@ -35,7 +35,7 @@ export class OrdersService {
         userId: '1',
         amount: 199.99,
         currency: 'USD',
-        description: 'Elite Plan',
+        description: 'Elite PlanXXL',
         status: OrderStatus.PAID,
       },
     ];
