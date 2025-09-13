@@ -31,6 +31,13 @@ export class OrdersService {
         description: 'Basic Plan',
         status: OrderStatus.PENDING,
       },
+      {
+        userId: '1',
+        amount: 199.99,
+        currency: 'USD',
+        description: 'Elite Plan',
+        status: OrderStatus.PAID,
+      },
     ];
 
     demoOrders.forEach((data) => {
