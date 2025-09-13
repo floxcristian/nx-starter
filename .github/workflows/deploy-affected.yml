@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - master
 
 env:
   GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
@@ -45,8 +46,13 @@ jobs:
       - name: Get Affected Services and Build Matrix
         id: get-affected
         run: |
-          # Usamos el comando moderno y más limpio para obtener solo las apps afectadas
-          AFFECTED_APPS=$(npx nx show projects --affected --type=app --plain | tr '\n' ' ')
+          # Obtenemos la rama base del evento de GitHub para hacerlo más robusto
+          # Esto evita el error si tu rama se llama 'main' en lugar de 'master'
+          BASE_BRANCH=$(jq -r '.repository.default_branch' "$GITHUB_EVENT_PATH")
+          echo "Determining affected apps by comparing HEAD against origin/${BASE_BRANCH}..."
+
+          # Usamos el comando moderno, apuntando a la rama base correcta
+          AFFECTED_APPS=$(npx nx show projects --affected --type=app --base="origin/${BASE_BRANCH}" --head=HEAD --plain | tr '\n' ' ')
 
           if [ -z "$AFFECTED_APPS" ]; then
             echo "No applications were affected."
@@ -57,10 +63,8 @@ jobs:
           echo "Affected applications: $AFFECTED_APPS"
           JSON_MATRIX="{\"include\":["
           for app in $AFFECTED_APPS; do
-            # Búsqueda robusta del puerto, inmune a warnings
             port=$(npx nx show project $app --json 2>/dev/null | grep '^{' | jq -r ".targets.serve.options.port // 3000")
             
-            # Verificación de seguridad para asegurar que la variable 'port' no esté vacía
             if [ -z "$port" ]; then
               port=3000
             fi
@@ -79,8 +83,8 @@ jobs:
   # ##########################################################################
   build-and-deploy:
     name: Deploy ${{ matrix.service.name }}
-    needs: determine-affected # Depende del job anterior
-    if: fromJson(needs.determine-affected.outputs.affected_matrix).include[0] != null # Solo se ejecuta si la matriz no está vacía
+    needs: determine-affected
+    if: fromJson(needs.determine-affected.outputs.affected_matrix).include[0] != null
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
