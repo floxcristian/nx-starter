@@ -32,8 +32,10 @@ ENV APP_NAME=${APP_NAME}
 # Variable de entorno para desactivar el daemon de Nx en entornos de CI/CD
 ENV NX_DAEMON=false
 
+# Copia el archivo de config de docker y lo renombra a .npmrc dentro del build
+COPY .npmrc.docker .npmrc
 # Copia los archivos de manifiesto y el .npmrc (clave para el caché)
-COPY .npmrc pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 
 # Usa --mount=type=cache para una instalación de dependencias ultra rápida.
 # El "store" de pnpm se persiste entre builds, haciendo que solo se descarguen
