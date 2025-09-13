@@ -45,7 +45,8 @@ jobs:
       - name: Get Affected Services and Build Matrix
         id: get-affected
         run: |
-          AFFECTED_APPS=$(npx nx affected:apps --base=origin/main --head=HEAD --plain | tr '\n' ' ')
+          # Usamos el comando moderno y más limpio para obtener solo las apps afectadas
+          AFFECTED_APPS=$(npx nx show projects --affected --type=app --plain | tr '\n' ' ')
 
           if [ -z "$AFFECTED_APPS" ]; then
             echo "No applications were affected."
@@ -53,12 +54,17 @@ jobs:
             exit 0
           fi
 
+          echo "Affected applications: $AFFECTED_APPS"
           JSON_MATRIX="{\"include\":["
           for app in $AFFECTED_APPS; do
-            echo "Processing affected app: $app"
-            # --- LÍNEA CORREGIDA ---
-            # Se añade '2>/dev/null' para ignorar warnings (stderr) y 'grep' para asegurar que solo el JSON se pasa a jq.
+            # Búsqueda robusta del puerto, inmune a warnings
             port=$(npx nx show project $app --json 2>/dev/null | grep '^{' | jq -r ".targets.serve.options.port // 3000")
+            
+            # Verificación de seguridad para asegurar que la variable 'port' no esté vacía
+            if [ -z "$port" ]; then
+              port=3000
+            fi
+
             JSON_MATRIX+=$(jq -n --arg name "$app" --argjson port "$port" '{"name":$name,"port":$port}')
             JSON_MATRIX+=","
           done
