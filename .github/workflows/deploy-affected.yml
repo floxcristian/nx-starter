@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - master
 
 env:
   GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
@@ -26,7 +25,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Crucial para que Nx pueda comparar commits
+          fetch-depth: 0
+          filter: tree:0
+
+      # La acción oficial de Nx para calcular los SHAs de base y cabeza correctamente.
+      - name: Set up Nx SHAs
+        uses: nrwl/nx-set-shas@v4
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v2
@@ -40,18 +44,14 @@ jobs:
           cache: 'pnpm'
 
       - name: Install Dependencies
-        # Se elimina el flag --store-dir para permitir que las actions gestionen el caché automáticamente
         run: pnpm install --frozen-lockfile
 
       - name: Get Affected Services and Build Matrix
         id: get-affected
         run: |
-          # Obtenemos la rama base del evento de GitHub para hacerlo más robusto
-          BASE_BRANCH=$(jq -r '.repository.default_branch' "$GITHUB_EVENT_PATH")
-          echo "Determining affected apps by comparing HEAD against origin/${BASE_BRANCH}..."
-
-          # Usamos el comando moderno, apuntando a la rama base correcta
-          AFFECTED_APPS=$(npx nx show projects --affected --type=app --base="origin/${BASE_BRANCH}" --head=HEAD --plain | tr '\n' ' ')
+          # El comando 'nx affected' ahora usa automáticamente las variables de entorno
+          # (NX_BASE, NX_HEAD) establecidas por el paso 'nrwl/nx-set-shas'.
+          AFFECTED_APPS=$(npx nx show projects --affected --type=app --plain | tr '\n' ' ')
 
           if [ -z "$AFFECTED_APPS" ]; then
             echo "No applications were affected."
@@ -63,11 +63,9 @@ jobs:
           JSON_MATRIX="{\"include\":["
           for app in $AFFECTED_APPS; do
             port=$(npx nx show project $app --json 2>/dev/null | grep '^{' | jq -r ".targets.serve.options.port // 3000")
-            
             if [ -z "$port" ]; then
               port=3000
             fi
-
             JSON_MATRIX+=$(jq -n --arg name "$app" --argjson port "$port" '{"name":$name,"port":$port}')
             JSON_MATRIX+=","
           done
