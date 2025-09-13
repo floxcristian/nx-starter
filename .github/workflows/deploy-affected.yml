@@ -30,3 +30,108 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v2
+        with:
+          version: 10 # Asegúrate de que coincida con tu packageManager
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        # Se elimina el flag --store-dir para permitir que las actions gestionen el caché automáticamente
+        run: pnpm install --frozen-lockfile
+
+      - name: Get Affected Services and Build Matrix
+        id: get-affected
+        run: |
+          # Obtenemos la rama base del evento de GitHub para hacerlo más robusto
+          BASE_BRANCH=$(jq -r '.repository.default_branch' "$GITHUB_EVENT_PATH")
+          echo "Determining affected apps by comparing HEAD against origin/${BASE_BRANCH}..."
+
+          # Usamos el comando moderno, apuntando a la rama base correcta
+          AFFECTED_APPS=$(npx nx show projects --affected --type=app --base="origin/${BASE_BRANCH}" --head=HEAD --plain | tr '\n' ' ')
+
+          if [ -z "$AFFECTED_APPS" ]; then
+            echo "No applications were affected."
+            echo "affected_matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Affected applications: $AFFECTED_APPS"
+          JSON_MATRIX="{\"include\":["
+          for app in $AFFECTED_APPS; do
+            port=$(npx nx show project $app --json 2>/dev/null | grep '^{' | jq -r ".targets.serve.options.port // 3000")
+            
+            if [ -z "$port" ]; then
+              port=3000
+            fi
+
+            JSON_MATRIX+=$(jq -n --arg name "$app" --argjson port "$port" '{"name":$name,"port":$port}')
+            JSON_MATRIX+=","
+          done
+          JSON_MATRIX=$(echo "$JSON_MATRIX" | sed 's/,$//')
+          JSON_MATRIX+="]}"
+
+          echo "Affected matrix generated: $JSON_MATRIX"
+          echo "affected_matrix=$JSON_MATRIX" >> $GITHUB_OUTPUT
+
+  # ##########################################################################
+  # # JOB 2: CONSTRUIR Y DESPLEGAR SOLO LAS APPS AFECTADAS
+  # ##########################################################################
+  build-and-deploy:
+    name: Deploy ${{ matrix.service.name }}
+    needs: determine-affected
+    if: fromJson(needs.determine-affected.outputs.affected_matrix).include[0] != null
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    strategy:
+      matrix: ${{ fromJson(needs.determine-affected.outputs.affected_matrix) }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK and Authorize Docker
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Build and Push Docker Image
+        id: build-image
+        run: |
+          IMAGE_BASE_NAME="${{ env.GAR_LOCATION }}/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ matrix.service.name }}"
+          IMAGE_SHA_TAG="$IMAGE_BASE_NAME:${{ github.sha }}"
+          IMAGE_LATEST_TAG="$IMAGE_BASE_NAME:latest"
+
+          docker build . \
+            --target production \
+            -t "$IMAGE_SHA_TAG" \
+            -t "$IMAGE_LATEST_TAG" \
+            --build-arg APP_NAME=${{ matrix.service.name }} \
+            --build-arg APP_PORT=${{ matrix.service.port }}
+
+          docker push "$IMAGE_SHA_TAG"
+          docker push "$IMAGE_LATEST_TAG"
+
+          echo "image_sha_tag=$IMAGE_SHA_TAG" >> $GITHUB_OUTPUT
+
+      - name: Deploy to Google Cloud Run
+        run: |
+          gcloud run deploy ${{ matrix.service.name }} \
+            --image ${{ steps.build-image.outputs.image_sha_tag }} \
+            --region ${{ env.GCP_REGION }} \
+            --port ${{ matrix.service.port }} \
+            --allow-unauthenticated \
+            --platform managed \
+            --quiet
