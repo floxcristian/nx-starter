@@ -62,19 +62,17 @@ jobs:
 
           echo "Affected applications: $AFFECTED_APPS"
 
-          # Lógica de construcción de JSON robusta
           JSON_OBJECTS=""
           for app in $AFFECTED_APPS; do
             port=$(npx nx show project $app --json 2>/dev/null | grep '^{' | jq -r ".targets.serve.options.port // 3000")
             if [ -z "$port" ]; then
               port=3000
             fi
-            # Generamos cada objeto JSON como una línea separada
             JSON_OBJECTS+=$(jq -n --arg name "$app" --argjson port "$port" '{"name":$name,"port":$port}')
           done
 
-          # Usamos jq en modo 'slurp' (-s) para leer todos los objetos y meterlos en un array
-          JSON_MATRIX=$(echo "$JSON_OBJECTS" | jq -s '{"include": .}')
+          # Usamos jq en modo 'slurp' (-s) y 'compact' (-c) para generar el JSON en una sola línea
+          JSON_MATRIX=$(echo "$JSON_OBJECTS" | jq -s -c '{"include": .}')
 
           echo "Affected matrix generated: $JSON_MATRIX"
           echo "affected_matrix=$JSON_MATRIX" >> $GITHUB_OUTPUT
