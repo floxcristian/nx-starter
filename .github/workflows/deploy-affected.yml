@@ -13,6 +13,9 @@ env:
   GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
 
 jobs:
+  # ##########################################################################
+  # # JOB 1: DETERMINAR QUÉ APLICACIONES FUERON AFECTADAS
+  # ##########################################################################
   determine-affected:
     name: Determine Affected Services
     runs-on: ubuntu-latest
@@ -23,8 +26,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          filter: tree:0
+          fetch-depth: 0 # Crucial para que Nx pueda comparar commits
+          filter: tree:0 # Optimización para un checkout más rápido
 
       - name: Set up Nx SHAs
         uses: nrwl/nx-set-shas@v4
@@ -32,7 +35,7 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 10
+          version: 10 # Asegúrate de que coincida con tu packageManager
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -50,9 +53,11 @@ jobs:
 
           if [ -z "$AFFECTED_APPS" ]; then
             echo "No applications were affected."
-            echo "affected_matrix={\"include\":[]}" >> $GITHUB_OUTPUT
+            echo "affected_matrix={\"service\":[]}" >> $GITHUB_OUTPUT
             exit 0
           fi
+
+          echo "Affected applications: $AFFECTED_APPS"
 
           JSON_OBJECTS=""
           for app in $AFFECTED_APPS; do
@@ -63,20 +68,20 @@ jobs:
             JSON_OBJECTS+=$(jq -n --arg name "$app" --argjson port "$port" '{"name":$name,"port":$port}')
           done
 
-          JSON_MATRIX=$(echo "$JSON_OBJECTS" | jq -s -c '{"include": .}')
+          # Usamos 'service' como clave para que coincida con la variable de la matriz.
+          JSON_MATRIX=$(echo "$JSON_OBJECTS" | jq -s -c '{"service": .}')
+
+          echo "Affected matrix generated: $JSON_MATRIX"
           echo "affected_matrix=$JSON_MATRIX" >> $GITHUB_OUTPUT
 
+  # ##########################################################################
+  # # JOB 2: CONSTRUIR Y DESPLEGAR SOLO LAS APPS AFECTADAS
+  # ##########################################################################
   build-and-deploy:
     name: Deploy ${{ matrix.service.name }}
     needs: determine-affected
-    if: fromJson(needs.determine-affected.outputs.affected_matrix).include[0] != null
+    if: fromJson(needs.determine-affected.outputs.affected_matrix).service[0] != null
     runs-on: ubuntu-latest
-
-    # --- AÑADIR ESTA SECCIÓN ---
-    # Apunta al entorno 'production' para obtener los secretos y variables correctos.
-    environment:
-      name: production
-
     permissions:
       contents: 'read'
       id-token: 'write'
@@ -118,7 +123,7 @@ jobs:
 
           echo "image_sha_tag=$IMAGE_SHA_TAG" >> $GITHUB_OUTPUT
 
-      - name: Deploy to Cloud Run
+      - name: Deploy to Google Cloud Run
         run: |
           gcloud run deploy ${{ matrix.service.name }} \
             --image ${{ steps.build-image.outputs.image_sha_tag }} \
