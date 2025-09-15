@@ -29,7 +29,7 @@ export class UsersService {
 
     const demo2 = new UserEntity({
       id: '2',
-      name: 'Super Admin',
+      name: 'Super Adminxx',
       email: 'superadmin@demo.com',
       phone: '+56912345678',
       password: hashedPassword,

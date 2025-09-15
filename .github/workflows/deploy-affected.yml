@@ -1,4 +1,4 @@
-name: Deploy Affected APIs to Cloud Run
+name: CI/CD - Test, Build, and Deploy Affected APIs
 
 on:
   push:
@@ -13,32 +13,70 @@ env:
   GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
 
 jobs:
-  determine-affected:
-    name: Determine Affected Services
+  # ##########################################################################
+  # # JOB 1: VERIFICACIÓN DE CALIDAD (CI)
+  # ##########################################################################
+  ci-checks:
+    name: Run Lint and Test on Affected Projects
     runs-on: ubuntu-latest
-    outputs:
-      affected_matrix: ${{ steps.get-affected.outputs.affected_matrix }}
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          filter: tree:0
+        with: { fetch-depth: 0, filter: tree:0 }
 
       - name: Set up Nx SHAs
         uses: nrwl/nx-set-shas@v4
 
-      - name: Set up pnpm
+      - name: Set up pnpm & Node.js
         uses: pnpm/action-setup@v2
-        with:
-          version: 10
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: 'pnpm' }
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      # --- NUEVO: CACHÉ DE NX ---
+      - name: Restore Nx cache
+        uses: actions/cache@v4
         with:
-          node-version: 22
-          cache: 'pnpm'
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      # --- NUEVO: PASOS DE VERIFICACIÓN ---
+      - name: Run Lint on Affected Projects
+        run: npx nx affected -t lint --parallel=3
+
+      - name: Run Tests on Affected Projects
+        run: npx nx affected -t test --parallel=3 --configuration=ci
+
+  # ##########################################################################
+  # # JOB 2: DETERMINAR QUÉ APLICACIONES DESPLEGAR
+  # ##########################################################################
+  determine-affected:
+    name: Determine Services to Deploy
+    runs-on: ubuntu-latest
+    outputs:
+      affected_matrix: ${{ steps.get-affected.outputs.affected_matrix }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with: { fetch-depth: 0, filter: tree:0 }
+
+      - name: Set up Nx SHAs
+        uses: nrwl/nx-set-shas@v4
+
+      - name: Set up pnpm & Node.js
+        uses: pnpm/action-setup@v2
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: 'pnpm' }
+
+      - name: Restore Nx cache
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
@@ -63,19 +101,16 @@ jobs:
           JSON_MATRIX=$(echo "$JSON_OBJECTS" | jq -s -c '{"service": .}')
           echo "affected_matrix=$JSON_MATRIX" >> $GITHUB_OUTPUT
 
+  # ##########################################################################
+  # # JOB 3: CONSTRUIR Y DESPLEGAR
+  # ##########################################################################
   build-and-deploy:
     name: Deploy ${{ matrix.service.name }}
-    needs: determine-affected
+    needs: [ci-checks, determine-affected] # <-- DEPENDE DE AMBOS JOBS ANTERIORES
     if: fromJson(needs.determine-affected.outputs.affected_matrix).service[0] != null
     runs-on: ubuntu-latest
-
-    environment:
-      name: production
-
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-
+    environment: { name: production }
+    permissions: { contents: 'read', id-token: 'write' }
     strategy:
       matrix: ${{ fromJson(needs.determine-affected.outputs.affected_matrix) }}
 
@@ -89,13 +124,11 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Set up Cloud SDK
+      - name: Set up Cloud SDK and Authorize Docker
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
-      # --- PASO CRUCIAL AÑADIDO ---
-      # Configura explícitamente el cliente de Docker para usar las credenciales de gcloud.
       - name: Configure Docker Credentials
         run: gcloud auth configure-docker ${{ env.GAR_LOCATION }} --quiet
 
@@ -105,17 +138,14 @@ jobs:
           IMAGE_BASE_NAME="${{ env.GAR_LOCATION }}/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ matrix.service.name }}"
           IMAGE_SHA_TAG="$IMAGE_BASE_NAME:${{ github.sha }}"
           IMAGE_LATEST_TAG="$IMAGE_BASE_NAME:latest"
-
           docker build . \
             --target production \
             -t "$IMAGE_SHA_TAG" \
             -t "$IMAGE_LATEST_TAG" \
             --build-arg APP_NAME=${{ matrix.service.name }} \
             --build-arg APP_PORT=${{ matrix.service.port }}
-
           docker push "$IMAGE_SHA_TAG"
           docker push "$IMAGE_LATEST_TAG"
-
           echo "image_sha_tag=$IMAGE_SHA_TAG" >> $GITHUB_OUTPUT
 
       - name: Deploy to Cloud Run
