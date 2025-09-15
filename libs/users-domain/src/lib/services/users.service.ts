@@ -27,17 +27,7 @@ export class UsersService {
       createdAt: new Date(),
     });
 
-    const demo2 = new UserEntity({
-      id: '2',
-      name: 'Super Adminxx',
-      email: 'superadmin@demo.com',
-      phone: '+56912345678',
-      password: hashedPassword,
-      createdAt: new Date(),
-    });
-
     this.users.push(demo);
-    this.users.push(demo2);
     this.currentId = 2;
   }
 
