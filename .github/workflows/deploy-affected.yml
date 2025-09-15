@@ -47,13 +47,11 @@ jobs:
         id: get-affected
         run: |
           AFFECTED_APPS=$(npx nx show projects --affected --type=app --plain | tr '\n' ' ')
-
           if [ -z "$AFFECTED_APPS" ]; then
             echo "No applications were affected."
             echo "affected_matrix={\"service\":[]}" >> $GITHUB_OUTPUT
             exit 0
           fi
-
           JSON_OBJECTS=""
           for app in $AFFECTED_APPS; do
             port=$(npx nx show project $app --json 2>/dev/null | grep '^{' | jq -r ".targets.serve.options.port // 3000")
@@ -62,7 +60,6 @@ jobs:
             fi
             JSON_OBJECTS+=$(jq -n --arg name "$app" --argjson port "$port" '{"name":$name,"port":$port}')
           done
-
           JSON_MATRIX=$(echo "$JSON_OBJECTS" | jq -s -c '{"service": .}')
           echo "affected_matrix=$JSON_MATRIX" >> $GITHUB_OUTPUT
 
@@ -72,8 +69,6 @@ jobs:
     if: fromJson(needs.determine-affected.outputs.affected_matrix).service[0] != null
     runs-on: ubuntu-latest
 
-    # --- AÑADIR ESTA SECCIÓN ---
-    # Apunta al entorno 'production' para obtener los secretos y variables correctos.
     environment:
       name: production
 
@@ -94,10 +89,15 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Set up Cloud SDK and Authorize Docker
+      - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
+
+      # --- PASO CRUCIAL AÑADIDO ---
+      # Configura explícitamente el cliente de Docker para usar las credenciales de gcloud.
+      - name: Configure Docker Credentials
+        run: gcloud auth configure-docker ${{ env.GAR_LOCATION }} --quiet
 
       - name: Build and Push Docker Image
         id: build-image
