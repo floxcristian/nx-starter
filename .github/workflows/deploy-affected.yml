@@ -14,11 +14,13 @@ env:
 
 jobs:
   # ##########################################################################
-  # # JOB 1: VERIFICACIÓN DE CALIDAD (CI)
+  # # JOB 1: VERIFICACIÓN Y PRUEBAS (CI)
   # ##########################################################################
   ci-checks:
     name: Run Lint and Test on Affected Projects
     runs-on: ubuntu-latest
+    env:
+      NX_CLOUD_AUTH_TOKEN: ${{ secrets.NX_CLOUD_AUTH_TOKEN }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -33,7 +35,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: 'pnpm' }
 
-      # --- NUEVO: CACHÉ DE NX ---
       - name: Restore Nx cache
         uses: actions/cache@v4
         with:
@@ -43,7 +44,6 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      # --- NUEVO: PASOS DE VERIFICACIÓN ---
       - name: Run Lint on Affected Projects
         run: npx nx affected -t lint --parallel=3
 
@@ -72,6 +72,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: 'pnpm' }
 
+      # --- CORRECCIÓN: PASO AÑADIDO DE VUELTA ---
       - name: Restore Nx cache
         uses: actions/cache@v4
         with:
@@ -106,7 +107,7 @@ jobs:
   # ##########################################################################
   build-and-deploy:
     name: Deploy ${{ matrix.service.name }}
-    needs: [ci-checks, determine-affected] # <-- DEPENDE DE AMBOS JOBS ANTERIORES
+    needs: [ci-checks, determine-affected]
     if: fromJson(needs.determine-affected.outputs.affected_matrix).service[0] != null
     runs-on: ubuntu-latest
     environment: { name: production }
@@ -124,7 +125,7 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Set up Cloud SDK and Authorize Docker
+      - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
@@ -138,14 +139,17 @@ jobs:
           IMAGE_BASE_NAME="${{ env.GAR_LOCATION }}/${{ env.GCP_PROJECT_ID }}/${{ env.GAR_REPOSITORY }}/${{ matrix.service.name }}"
           IMAGE_SHA_TAG="$IMAGE_BASE_NAME:${{ github.sha }}"
           IMAGE_LATEST_TAG="$IMAGE_BASE_NAME:latest"
+
           docker build . \
             --target production \
             -t "$IMAGE_SHA_TAG" \
             -t "$IMAGE_LATEST_TAG" \
             --build-arg APP_NAME=${{ matrix.service.name }} \
             --build-arg APP_PORT=${{ matrix.service.port }}
+
           docker push "$IMAGE_SHA_TAG"
           docker push "$IMAGE_LATEST_TAG"
+
           echo "image_sha_tag=$IMAGE_SHA_TAG" >> $GITHUB_OUTPUT
 
       - name: Deploy to Cloud Run
