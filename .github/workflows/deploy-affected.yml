@@ -1,11 +1,14 @@
+# Nombre del workflow, aparecerá en la pestaña "Actions" de GitHub.
 name: CI/CD - Test, Build, and Deploy Affected APIs
 
+# Define cuándo se ejecutará este workflow.
 on:
   push:
     branches:
-      - main
-      - master
+      - main # Se activa automáticamente solo en pushes a la rama 'main'.
 
+# Variables de entorno disponibles para todos los jobs del workflow.
+# Se leen desde las variables configuradas en los ajustes del repositorio de GitHub.
 env:
   GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
   GCP_REGION: ${{ vars.GCP_REGION }}
@@ -13,50 +16,71 @@ env:
   GAR_REPOSITORY: ${{ vars.GAR_REPOSITORY }}
 
 jobs:
-  # ##########################################################################
-  # # JOB 1: VERIFICACIÓN Y PRUEBAS (CI)
-  # ##########################################################################
+  # ==========================================================================
+  # JOB 1: VERIFICACIÓN DE CALIDAD (INTEGRACIÓN CONTINUA - CI)
+  # Su única misión es asegurar que el código nuevo cumple con los estándares
+  # de calidad antes de considerar un despliegue.
+  # ==========================================================================
   ci-checks:
     name: Run Lint and Test on Affected Projects
     runs-on: ubuntu-latest
     env:
+      # Inyectamos el token de Nx Cloud para usar el caché remoto y acelerar los builds.
       NX_CLOUD_AUTH_TOKEN: ${{ secrets.NX_CLOUD_AUTH_TOKEN }}
     steps:
+      # Paso 1: Descargar el código del repositorio.
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with: { fetch-depth: 0, filter: tree:0 }
+        with:
+          # fetch-depth: 0 clona el historial completo de Git. Es OBLIGATORIO para que Nx
+          # pueda comparar los cambios entre commits.
+          fetch-depth: 0
+          # filter: tree:0 es una optimización que clona el historial sin descargar el
+          # contenido de los archivos antiguos, haciendo el checkout mucho más rápido.
+          filter: tree:0
 
+      # Paso 2: Usar la acción oficial de Nx para calcular los SHAs de 'base' y 'head'.
+      # Esto resuelve de forma robusta qué commits comparar para 'nx affected'.
       - name: Set up Nx SHAs
         uses: nrwl/nx-set-shas@v4
 
+      # Paso 3: Configurar el entorno de Node.js y pnpm.
       - name: Set up pnpm & Node.js
         uses: pnpm/action-setup@v2
         with: { version: 10 }
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: 'pnpm' }
 
+      # Paso 4: Restaurar el caché de Nx desde ejecuciones anteriores.
+      # Acelera los comandos de Nx al reutilizar cálculos previos.
       - name: Restore Nx cache
         uses: actions/cache@v4
         with:
           path: .nx/cache
           key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
+      # Paso 5: Instalar las dependencias del proyecto.
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      # Paso 6: Ejecutar el linter solo en los proyectos afectados por los cambios.
       - name: Run Lint on Affected Projects
         run: npx nx affected -t lint --parallel=3
 
+      # Paso 7: Ejecutar las pruebas solo en los proyectos afectados.
       - name: Run Tests on Affected Projects
         run: npx nx affected -t test --parallel=3 --configuration=ci
 
-  # ##########################################################################
-  # # JOB 2: DETERMINAR QUÉ APLICACIONES DESPLEGAR
-  # ##########################################################################
+  # ==========================================================================
+  # JOB 2: DETERMINAR QUÉ APLICACIONES DESPLEGAR
+  # Este job calcula la "matriz" de despliegue, es decir, la lista de
+  # aplicaciones que necesitan ser construidas y desplegadas.
+  # ==========================================================================
   determine-affected:
     name: Determine Services to Deploy
     runs-on: ubuntu-latest
     outputs:
+      # El resultado de este job (la matriz) se expone para que otros jobs puedan usarlo.
       affected_matrix: ${{ steps.get-affected.outputs.affected_matrix }}
     steps:
       - name: Checkout Repository
@@ -72,7 +96,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: 'pnpm' }
 
-      # --- CORRECCIÓN: PASO AÑADIDO DE VUELTA ---
       - name: Restore Nx cache
         uses: actions/cache@v4
         with:
@@ -82,15 +105,23 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
+      # Paso final: Calcular las apps afectadas y construir la matriz JSON.
       - name: Get Affected Services and Build Matrix
         id: get-affected
         run: |
+          # Obtenemos solo las 'apps' afectadas, ignorando las librerías.
           AFFECTED_APPS=$(npx nx show projects --affected --type=app --plain | tr '\n' ' ')
+
+          # Si no hay apps afectadas, generamos una matriz vacía para terminar el workflow limpiamente.
           if [ -z "$AFFECTED_APPS" ]; then
             echo "No applications were affected."
             echo "affected_matrix={\"service\":[]}" >> $GITHUB_OUTPUT
             exit 0
           fi
+
+          echo "Affected applications: $AFFECTED_APPS"
+
+          # Construimos un objeto JSON para cada app, incluyendo su puerto de despliegue.
           JSON_OBJECTS=""
           for app in $AFFECTED_APPS; do
             port=$(npx nx show project $app --json 2>/dev/null | grep '^{' | jq -r ".targets.serve.options.port // 3000")
@@ -99,19 +130,30 @@ jobs:
             fi
             JSON_OBJECTS+=$(jq -n --arg name "$app" --argjson port "$port" '{"name":$name,"port":$port}')
           done
+
+          # Ensamblamos los objetos en un JSON final en una sola línea (con -c) para que GitHub lo procese.
           JSON_MATRIX=$(echo "$JSON_OBJECTS" | jq -s -c '{"service": .}')
+          echo "Affected matrix generated: $JSON_MATRIX"
           echo "affected_matrix=$JSON_MATRIX" >> $GITHUB_OUTPUT
 
-  # ##########################################################################
-  # # JOB 3: CONSTRUIR Y DESPLEGAR
-  # ##########################################################################
+  # ==========================================================================
+  # JOB 3: CONSTRUIR Y DESPLEGAR (DESPLIEGUE CONTINUO - CD)
+  # Este job toma la lista de apps afectadas y ejecuta el despliegue para cada una.
+  # ==========================================================================
   build-and-deploy:
     name: Deploy ${{ matrix.service.name }}
+    # 'needs' asegura que este job solo se ejecute si 'ci-checks' y 'determine-affected' terminan con éxito.
     needs: [ci-checks, determine-affected]
+    # 'if' asegura que el job solo se inicie si la matriz de despliegue no está vacía.
     if: fromJson(needs.determine-affected.outputs.affected_matrix).service[0] != null
     runs-on: ubuntu-latest
+    # 'environment' le dice a GitHub que use los secretos y variables del entorno 'production'.
     environment: { name: production }
+    # 'permissions' son necesarias para la autenticación segura con Google Cloud.
     permissions: { contents: 'read', id-token: 'write' }
+
+    # 'strategy.matrix' crea un job separado para cada elemento en la lista que generamos.
+    # Esto permite despliegues en paralelo, lo que es muy eficiente.
     strategy:
       matrix: ${{ fromJson(needs.determine-affected.outputs.affected_matrix) }}
 
@@ -119,20 +161,25 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # Paso de autenticación segura con GCP usando Workload Identity Federation. No necesita claves.
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
+      # Configura el CLI de gcloud.
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.GCP_PROJECT_ID }}
 
+      # Este paso es crucial: configura el cliente de Docker para que se autentique con Artifact Registry.
       - name: Configure Docker Credentials
         run: gcloud auth configure-docker ${{ env.GAR_LOCATION }} --quiet
 
+      # Construye la imagen de Docker y la sube a Artifact Registry con dos etiquetas:
+      # una con el SHA del commit (única) y otra 'latest'.
       - name: Build and Push Docker Image
         id: build-image
         run: |
@@ -152,6 +199,8 @@ jobs:
 
           echo "image_sha_tag=$IMAGE_SHA_TAG" >> $GITHUB_OUTPUT
 
+      # Despliega la imagen en Cloud Run usando la etiqueta única del SHA para garantizar
+      # que se despliega la versión correcta.
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ matrix.service.name }} \
