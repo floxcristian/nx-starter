@@ -20,7 +20,7 @@ GCLOUD_IDENTITY_PROVIDER="github-provider"
 # --- Variables Calculadas (no tocar) ---
 GCLOUD_SERVICE_ACCOUNT_EMAIL="${GCLOUD_SERVICE_ACCOUNT}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
 
-echo "🚀 Iniciando configuración de CI/CD para:"
+echo "🚀 Iniciando configuración de CI/CD y API Gateway para:"
 echo "   📁 Proyecto: ${GCP_PROJECT_ID}"
 echo "   🐙 Repositorio: ${GITHUB_REPO}"
 echo "------------------------------------------------------------------"
@@ -46,6 +46,9 @@ gcloud services enable \
   artifactregistry.googleapis.com \
   run.googleapis.com \
   iamcredentials.googleapis.com \
+  apigateway.googleapis.com \
+  servicemanagement.googleapis.com \
+  servicecontrol.googleapis.com \
   --project="${GCP_PROJECT_ID}"
 echo "✅ APIs habilitadas"
 echo "------------------------------------------------------------------"
@@ -89,6 +92,9 @@ echo "🔐 Asignando roles necesarios a la cuenta de servicio..."
 gcloud projects add-iam-policy-binding "${GCP_PROJECT_ID}" --member="serviceAccount:${GCLOUD_SERVICE_ACCOUNT_EMAIL}" --role="roles/artifactregistry.writer"
 gcloud projects add-iam-policy-binding "${GCP_PROJECT_ID}" --member="serviceAccount:${GCLOUD_SERVICE_ACCOUNT_EMAIL}" --role="roles/run.admin"
 gcloud projects add-iam-policy-binding "${GCP_PROJECT_ID}" --member="serviceAccount:${GCLOUD_SERVICE_ACCOUNT_EMAIL}" --role="roles/iam.serviceAccountUser"
+# --- Permisos adicionales para que la SA pueda gestionar el API Gateway ---
+gcloud projects add-iam-policy-binding "${GCP_PROJECT_ID}" --member="serviceAccount:${GCLOUD_SERVICE_ACCOUNT_EMAIL}" --role="roles/apigateway.admin"
+gcloud projects add-iam-policy-binding "${GCP_PROJECT_ID}" --member="serviceAccount:${GCLOUD_SERVICE_ACCOUNT_EMAIL}" --role="roles/servicecontrol.serviceAgent"
 echo "✅ Roles asignados"
 echo "------------------------------------------------------------------"
 
