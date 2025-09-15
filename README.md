@@ -146,3 +146,5 @@ nx g @nx/angular:lib --name=shared-ui --directory=libs/shared-ui --buildable
   "bcryptjs": "^3.0.2"
 
   pnpm add @nestjs/jwt @nestjs/passport bcryptjs --filter @nx-starter/users-domain
+
+pruebita
