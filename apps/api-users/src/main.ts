@@ -15,21 +15,26 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const config = new DocumentBuilder()
-    .setTitle('Users API')
-    .setDescription('Microservicio de usuarios')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api-docs', app, document);
-
   // Health check
   app.use('/health', (req, res) => res.status(200).send('OK'));
 
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
+
+  const config = new DocumentBuilder()
+    .setTitle('Users API')
+    .setDescription('Microservicio de usuarios')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .addServer('', 'Production server') // Adds the base server URL
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api-docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
   const port = process.env.PORT || 3000;
   await app.listen(port);
   Logger.log(
