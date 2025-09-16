@@ -94,7 +94,6 @@ gcloud projects add-iam-policy-binding "${GCP_PROJECT_ID}" --member="serviceAcco
 gcloud projects add-iam-policy-binding "${GCP_PROJECT_ID}" --member="serviceAccount:${GCLOUD_SERVICE_ACCOUNT_EMAIL}" --role="roles/iam.serviceAccountUser"
 # --- Permisos adicionales para que la SA pueda gestionar el API Gateway ---
 gcloud projects add-iam-policy-binding "${GCP_PROJECT_ID}" --member="serviceAccount:${GCLOUD_SERVICE_ACCOUNT_EMAIL}" --role="roles/apigateway.admin"
-gcloud projects add-iam-policy-binding "${GCP_PROJECT_ID}" --member="serviceAccount:${GCLOUD_SERVICE_ACCOUNT_EMAIL}" --role="roles/servicecontrol.serviceAgent"
 echo "✅ Roles asignados"
 echo "------------------------------------------------------------------"
 
