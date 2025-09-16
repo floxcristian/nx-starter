@@ -1,0 +1,45 @@
+{
+  "name": "openapi-tools",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "tools/openapi",
+  "targets": {
+    "generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bash tools/openapi/scripts/generate-openapi.sh dev",
+        "cwd": "{workspaceRoot}"
+      },
+      "configurations": {
+        "development": {
+          "command": "bash tools/openapi/scripts/generate-openapi.sh dev"
+        },
+        "production": {
+          "command": "bash tools/openapi/scripts/generate-openapi.sh prod"
+        }
+      }
+    },
+    "validate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "swagger-codegen validate -i openapi-gateway.yaml"
+      },
+      "dependsOn": ["generate"]
+    },
+    "deploy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "gcloud api-gateway api-configs create config-$(date +%s) --api=monorepo-gateway --openapi-spec=openapi-gateway.yaml"
+      },
+      "dependsOn": ["validate"]
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["tools/openapi/**/*.ts"]
+      }
+    }
+  },
+  "tags": ["scope:tools", "type:util"]
+}

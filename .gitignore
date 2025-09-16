@@ -44,3 +44,11 @@ Thumbs.db
 .github/instructions/nx.instructions.md
 .angular
 .npmrc
+
+# Environment variables
+# Ignore all .env files but allow .example files
+.env*
+!.env*.example
+
+# OpenAPI generated files
+openapi-gateway*.yaml

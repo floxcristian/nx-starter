@@ -58,6 +58,48 @@ You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx 
 
 [Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
 
+## OpenAPI para Google Cloud API Gateway
+
+Este proyecto incluye herramientas para generar especificaciones OpenAPI optimizadas para Google Cloud API Gateway.
+
+### Comandos disponibles:
+
+```bash
+# Generar especificación OpenAPI para DESARROLLO (por defecto)
+npm run openapi:generate
+# o usando Nx
+nx run openapi-tools:generate
+
+# Generar para PRODUCCIÓN
+nx run openapi-tools:generate:production
+
+# Validar especificación generada
+npm run openapi:validate
+# o usando Nx
+nx run openapi-tools:validate
+
+# Desplegar a Google Cloud API Gateway
+npm run gateway:deploy
+# o usando Nx
+nx run openapi-tools:deploy
+```
+
+**⚠️ Nota:** Para generar especificaciones de producción, usa siempre el comando explícito `nx run openapi-tools:generate:production`.
+
+### Configuración requerida:
+
+```bash
+# Variables de entorno para los servicios
+export USERS_BACKEND_URL=https://users-api.example.com
+export ORDERS_BACKEND_URL=https://orders-api.example.com
+
+# Variables opcionales para Google Cloud
+export GOOGLE_CLOUD_PROJECT=mi-proyecto-id
+export GOOGLE_CLIENT_ID=123456789.apps.googleusercontent.com
+```
+
+Más información detallada en `tools/openapi/README.md`.
+
 ## Install Nx Console
 
 Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
