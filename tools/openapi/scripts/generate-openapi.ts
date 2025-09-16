@@ -323,10 +323,7 @@ function enhanceSpecForGoogleCloud(
   Object.assign(enhancedSpec.securityDefinitions, securitySchemes);
 
   // Añadir seguridad global (todas las operaciones requieren API key por defecto)
-  enhancedSpec.security = [
-    { api_key: [] },
-    { x_api_key: [] }
-  ];
+  enhancedSpec.security = [{ api_key: [] }, { x_api_key: [] }];
 
   // Configurar backends para cada path
   const HTTP_METHODS = [
@@ -366,7 +363,7 @@ function enhanceSpecForGoogleCloud(
               // Asegurar que cada operación tenga seguridad (API key requerida)
               security: operation.security || [
                 { api_key: [] },
-                { x_api_key: [] }
+                { x_api_key: [] },
               ],
             });
           }
@@ -506,21 +503,25 @@ async function generateSpec() {
   // Limpiar security definitions incompatibles con Google Cloud
   console.log('🧹 Limpiando security definitions para Google Cloud...');
   if (finalCombinedSpec.securityDefinitions) {
-    Object.keys(finalCombinedSpec.securityDefinitions).forEach(key => {
+    Object.keys(finalCombinedSpec.securityDefinitions).forEach((key) => {
       const secDef = finalCombinedSpec.securityDefinitions[key];
       if (secDef.type === 'apiKey') {
-        const isValidApiKey = 
+        const isValidApiKey =
           (secDef.name === 'key' && secDef.in === 'query') ||
           (secDef.name === 'api_key' && secDef.in === 'query') ||
           (secDef.name === 'x-api-key' && secDef.in === 'header');
-        
+
         if (!isValidApiKey) {
-          console.log(`   ⚠️ Removiendo security definition incompatible: ${key} (name: ${secDef.name}, in: ${secDef.in})`);
+          console.log(
+            `   ⚠️ Removiendo security definition incompatible: ${key} (name: ${secDef.name}, in: ${secDef.in})`
+          );
           delete finalCombinedSpec.securityDefinitions[key];
         }
       } else if (secDef.type !== 'oauth2') {
         // Remover otros tipos no soportados
-        console.log(`   ⚠️ Removiendo security definition no soportado: ${key} (type: ${secDef.type})`);
+        console.log(
+          `   ⚠️ Removiendo security definition no soportado: ${key} (type: ${secDef.type})`
+        );
         delete finalCombinedSpec.securityDefinitions[key];
       }
     });

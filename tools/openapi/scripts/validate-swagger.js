@@ -107,44 +107,61 @@ function validateSwagger20(filePath) {
 
     // 5. Validar compatibilidad con Google Cloud API Gateway
     if (spec.paths) {
-      Object.keys(spec.paths).forEach(pathKey => {
+      Object.keys(spec.paths).forEach((pathKey) => {
         const pathItem = spec.paths[pathKey];
-        const httpMethods = ['get', 'post', 'put', 'delete', 'patch', 'options', 'head'];
-        
-        httpMethods.forEach(method => {
+        const httpMethods = [
+          'get',
+          'post',
+          'put',
+          'delete',
+          'patch',
+          'options',
+          'head',
+        ];
+
+        httpMethods.forEach((method) => {
           const operation = pathItem[method];
           if (operation) {
             const operationPath = `paths.${pathKey}.${method}`;
-            
+
             // Verificar x-google-backend protocol
-            if (operation['x-google-backend'] && operation['x-google-backend'].protocol) {
+            if (
+              operation['x-google-backend'] &&
+              operation['x-google-backend'].protocol
+            ) {
               const protocol = operation['x-google-backend'].protocol;
               if (protocol !== 'http/1.1' && protocol !== 'h2') {
-                errors.push(`${operationPath}: x-google-backend protocol debe ser 'http/1.1' o 'h2' (encontrado: '${protocol}')`);
+                errors.push(
+                  `${operationPath}: x-google-backend protocol debe ser 'http/1.1' o 'h2' (encontrado: '${protocol}')`
+                );
               }
             }
-            
+
             // Verificar que cada operación tenga security
             if (!operation.security && !spec.security) {
-              warnings.push(`${operationPath}: Operación no requiere API key. Google Cloud recomienda security en cada operación.`);
+              warnings.push(
+                `${operationPath}: Operación no requiere API key. Google Cloud recomienda security en cada operación.`
+              );
             }
           }
         });
       });
     }
-    
+
     // 6. Validar security definitions para Google Cloud
     if (spec.securityDefinitions) {
-      Object.keys(spec.securityDefinitions).forEach(key => {
+      Object.keys(spec.securityDefinitions).forEach((key) => {
         const secDef = spec.securityDefinitions[key];
         if (secDef.type === 'apiKey') {
-          const isValidApiKey = 
+          const isValidApiKey =
             (secDef.name === 'key' && secDef.in === 'query') ||
             (secDef.name === 'api_key' && secDef.in === 'query') ||
             (secDef.name === 'x-api-key' && secDef.in === 'header');
-          
+
           if (!isValidApiKey) {
-            errors.push(`securityDefinitions.${key}: Google Cloud solo acepta apiKey con name='key'|'api_key' in='query' o name='x-api-key' in='header'`);
+            errors.push(
+              `securityDefinitions.${key}: Google Cloud solo acepta apiKey con name='key'|'api_key' in='query' o name='x-api-key' in='header'`
+            );
           }
         }
       });
