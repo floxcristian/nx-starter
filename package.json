@@ -20,9 +20,12 @@
     "lint:all": "nx run-many -t=lint --all --parallel",
     "lint:fix": "nx run-many -t=lint --all --parallel --fix",
     "gcp:setup": "bash ./tools/scripts/setup-gcp.sh",
-    "openapi:generate": "bash ./tools/openapi/scripts/generate-openapi.sh",
-    "openapi:validate": "swagger-codegen validate -i openapi-gateway.yaml",
-    "gateway:deploy": "gcloud api-gateway api-configs create config-$(date +%s) --api=monorepo-gateway --openapi-spec=openapi-gateway.yaml"
+    "openapi:generate:dev": "nx run openapi-tools:generate:dev",
+    "openapi:generate:prod": "nx run openapi-tools:generate:prod",
+    "openapi:validate:dev": "nx run openapi-tools:validate:dev",
+    "openapi:validate:prod": "nx run openapi-tools:validate:prod",
+    "gateway:deploy:dev": "nx run openapi-tools:deploy:dev",
+    "gateway:deploy:prod": "nx run openapi-tools:deploy:prod"
   },
   "private": true,
   "dependencies": {
@@ -84,6 +87,7 @@
     "@types/node": "20.19.9",
     "@typescript-eslint/utils": "^8.40.0",
     "angular-eslint": "^20.2.0",
+    "api-spec-converter": "^2.12.0",
     "eslint": "^9.8.0",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-playwright": "^1.6.2",

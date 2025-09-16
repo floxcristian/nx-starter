@@ -110,8 +110,13 @@ fi
 # Cambiar al directorio del workspace
 cd "$WORKSPACE_ROOT"
 
+# Compilar librerías de dominio necesarias
+echo "🔧 Compilando librerías de dominio..."
+nx build users-domain orders-domain
+
 # Generar especificación
-echo "🚀 Generando especificación OpenAPI para entorno: $ENVIRONMENT"
+echo "🚀 Ejecutando el generador..."
+node_modules/.bin/ts-node --project tools/openapi/tsconfig.json tools/openapi/scripts/generate-openapi.ts "$@"
 
 if [[ "$ENVIRONMENT" == "prod" ]]; then
     ts-node tools/openapi/scripts/generate-openapi.ts \

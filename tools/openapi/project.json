@@ -4,34 +4,49 @@
   "projectType": "library",
   "sourceRoot": "tools/openapi",
   "targets": {
-    "generate": {
+    "generate:dev": {
       "executor": "nx:run-commands",
       "options": {
         "command": "bash tools/openapi/scripts/generate-openapi.sh dev",
         "cwd": "{workspaceRoot}"
-      },
-      "configurations": {
-        "development": {
-          "command": "bash tools/openapi/scripts/generate-openapi.sh dev"
-        },
-        "production": {
-          "command": "bash tools/openapi/scripts/generate-openapi.sh prod"
-        }
       }
     },
-    "validate": {
+    "generate:prod": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "swagger-codegen validate -i openapi-gateway.yaml"
-      },
-      "dependsOn": ["generate"]
+        "command": "bash tools/openapi/scripts/generate-openapi.sh prod",
+        "cwd": "{workspaceRoot}"
+      }
     },
-    "deploy": {
+    "validate:dev": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "gcloud api-gateway api-configs create config-$(date +%s) --api=monorepo-gateway --openapi-spec=openapi-gateway.yaml"
+        "command": "node tools/openapi/scripts/validate-swagger.js openapi-gateway-dev.yaml",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "validate:prod": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node tools/openapi/scripts/validate-swagger.js openapi-gateway-prod.yaml",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "deploy:dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "gcloud api-gateway api-configs create config-dev-$(date +%s) --api=monorepo-gateway --openapi-spec=openapi-gateway-dev.yaml",
+        "cwd": "{workspaceRoot}"
       },
-      "dependsOn": ["validate"]
+      "dependsOn": ["validate:dev"]
+    },
+    "deploy:prod": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "gcloud api-gateway api-configs create config-prod-$(date +%s) --api=monorepo-gateway --openapi-spec=openapi-gateway-prod.yaml",
+        "cwd": "{workspaceRoot}"
+      },
+      "dependsOn": ["validate:prod"]
     },
     "lint": {
       "executor": "@nx/eslint:lint",
