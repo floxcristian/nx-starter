@@ -1,12 +1,17 @@
-# OpenAPI Tools
+# 🌐 OpenAPI Tools con Auto-Discovery
 
-Este directorio contiene herramientas para generar y gestionar especificaciones OpenAPI para Google Cloud API Gateway.
+Este directorio contiene herramientas inteligentes para generar y gestionar especificaciones OpenAPI para Google Cloud API Gateway.
 
-## Scripts Disponibles
+## 🚀 Scripts Disponibles
 
 ### generate-openapi.ts
 
-Script principal que genera la especificación OpenAPI combinando todos los microservicios del monorepo.
+Script principal con **auto-discovery** que:
+
+- ✨ **Detecta automáticamente** todos los microservicios del monorepo
+- 🏗️ **Extrae configuración real** de Swagger desde código NestJS
+- 🔄 **Convierte automáticamente** OpenAPI 3.0 → Swagger 2.0
+- ☁️ **Optimiza para Google Cloud** API Gateway
 
 ## Uso con Nx
 
@@ -171,6 +176,10 @@ npm run gateway:deploy
 - `USERS_BACKEND_URL`: URL del servicio de usuarios
 - `ORDERS_BACKEND_URL`: URL del servicio de órdenes
 
+### Variables de entorno requeridas:
+
+- `GOOGLE_CLOUD_PROJECT`: ID del proyecto de Google Cloud (REQUERIDO para deployment y Firebase Auth)
+
 ### Variables de entorno opcionales:
 
 - `OPENAPI_OUTPUT_FILE`: Archivo de salida personalizado
@@ -178,8 +187,6 @@ npm run gateway:deploy
 - `GATEWAY_DESCRIPTION`: Descripción del gateway personalizada
 - `GATEWAY_VERSION`: Versión del gateway personalizada
 - `BACKEND_PROTOCOL`: Protocolo de backend (default: https)
-- `GOOGLE_CLOUD_PROJECT`: ID del proyecto de Google Cloud
-- `GOOGLE_CLIENT_ID`: ID del cliente OAuth de Google
 
 ### Argumentos CLI disponibles:
 
@@ -189,7 +196,6 @@ npm run gateway:deploy
 - `--version <version>`: Versión del gateway
 - `--protocol <protocol>`: Protocolo de backend
 - `--project-id <id>`: ID del proyecto de Google Cloud
-- `--client-id <id>`: ID del cliente OAuth de Google
 - `--help`: Mostrar ayuda
 
 ## Características
@@ -209,50 +215,111 @@ npm run gateway:deploy
 - ✅ Type safety completo
 - ✅ Logging detallado
 
-### Flexibilidad
+### Flexibilidad y Automatización
 
+- ✅ **Auto-discovery de servicios** - No necesitas editar código para añadir APIs
+- ✅ **Carga dinámica de módulos** - Importa módulos NestJS en runtime
+- ✅ **Extracción real de Swagger** - Usa configuración real de tus APIs (no mock)
+- ✅ **Conversión automática** - OpenAPI 3.0 → Swagger 2.0 con api-spec-converter
 - ✅ Configuración via CLI y variables de entorno
 - ✅ Integración con Nx workspace
 - ✅ Soporte para múltiples entornos
-- ✅ Fácil extensión para nuevos servicios
 
-## Añadir nuevos servicios
+## ✨ Añadir nuevos servicios (Auto-Discovery)
 
-Para añadir un nuevo servicio al gateway, edita el array `SERVICES` en `generate-openapi.ts`:
+El sistema usa **auto-discovery**, por lo que **NO necesitas editar código** para añadir nuevos servicios. Simplemente:
 
-```typescript
-const SERVICES: ServiceConfig[] = [
-  // ... servicios existentes
-  {
-    name: 'nuevo-servicio',
-    module: NuevoServicioAppModule,
-    urlEnvVar: 'NUEVO_SERVICIO_BACKEND_URL',
-    pathPrefix: '/nuevo-servicio',
-    title: 'Nuevo Servicio API',
-  },
-];
-```
-
-Y asegúrate de:
-
-1. Importar el módulo correspondiente
-2. Definir la variable de entorno
-3. Configurar el path prefix apropiado
-
-## Deployment a Google Cloud
-
-1. Asegúrate de tener configurado gcloud CLI
-2. Crea un API Gateway en Google Cloud Console
-3. Ejecuta el comando de deploy con las credenciales apropiadas
+### 1. **Crear la app NestJS**
 
 ```bash
-# Ejemplo completo
-export USERS_BACKEND_URL=https://users-service.example.com
-export ORDERS_BACKEND_URL=https://orders-service.example.com
-export GOOGLE_CLOUD_PROJECT=mi-proyecto-id
-export GOOGLE_CLIENT_ID=123456789.apps.googleusercontent.com
+nx generate @nx/nest:app api-nuevo-servicio
+```
 
+### 2. **Añadir variable de entorno**
+
+```bash
+# En .env.dev o .env.prod
+NUEVO_SERVICIO_BACKEND_URL=https://api-nuevo-servicio-xxx.run.app/api
+```
+
+### 3. **¡Eso es todo!** 🎉
+
+```bash
+npm run gateway:dev
+# ✅ El nuevo servicio se detecta automáticamente
+```
+
+### 🔍 **Cómo funciona el Auto-Discovery:**
+
+El sistema busca automáticamente:
+
+1. **Variables de entorno** que terminen en `_BACKEND_URL`
+2. **Apps correspondientes** en `apps/api-{nombre}/`
+3. **Módulos** en `apps/api-{nombre}/src/app/app.module.ts`
+
+### 📋 **Ejemplo de detección automática:**
+
+```
+Variable: PAYMENTS_BACKEND_URL=https://...
+         ↓ (detecta "PAYMENTS")
+App:     apps/api-payments/src/app/app.module.ts
+         ↓ (genera automáticamente)
+Path:    /payments
+Title:   Payments API
+```
+
+### ⚠️ **Requisitos para que funcione:**
+
+- ✅ Variable termine en `_BACKEND_URL`
+- ✅ App existe en `apps/api-{nombre}/`
+- ✅ Módulo existe en `src/app/app.module.ts`
+- ✅ App tiene configuración de Swagger
+
+## 🚀 Deployment a Google Cloud
+
+### Configuración inicial (una sola vez):
+
+```bash
+npm run gcp:setup
+```
+
+### Deployment completo:
+
+#### Para desarrollo:
+
+```bash
+npm run gateway:dev
+# ✅ Genera + Despliega + Crea gateway automáticamente
+```
+
+#### Para producción:
+
+```bash
+npm run gateway:prod
+# ✅ Flujo completo para producción
+```
+
+### Variables requeridas:
+
+```bash
+# APIs de tus servicios (detección automática)
+export USERS_BACKEND_URL=https://users-api.example.com
+export ORDERS_BACKEND_URL=https://orders-api.example.com
+
+# Google Cloud (REQUERIDAS)
+# Variables REQUERIDAS para Google Cloud
+export GOOGLE_CLOUD_PROJECT=mi-proyecto-id
+```
+
+### Comandos granulares (para debugging):
+
+```bash
+# Solo generar spec
 nx run openapi-tools:generate:production
+
+# Solo validar
 nx run openapi-tools:validate
+
+# Solo desplegar
 nx run openapi-tools:deploy
 ```

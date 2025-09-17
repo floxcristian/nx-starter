@@ -58,47 +58,36 @@ You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx 
 
 [Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
 
-## OpenAPI para Google Cloud API Gateway
+## 🌐 API Gateway con Google Cloud
 
-Este proyecto incluye herramientas para generar especificaciones OpenAPI optimizadas para Google Cloud API Gateway.
+Este proyecto incluye un sistema completo de generación automática de API Gateway para Google Cloud, con extracción real de especificaciones OpenAPI desde tus APIs NestJS.
 
-### Comandos disponibles:
-
-```bash
-# Generar especificación OpenAPI para DESARROLLO (por defecto)
-npm run openapi:generate
-# o usando Nx
-nx run openapi-tools:generate
-
-# Generar para PRODUCCIÓN
-nx run openapi-tools:generate:production
-
-# Validar especificación generada
-npm run openapi:validate
-# o usando Nx
-nx run openapi-tools:validate
-
-# Desplegar a Google Cloud API Gateway
-npm run gateway:deploy
-# o usando Nx
-nx run openapi-tools:deploy
-```
-
-**⚠️ Nota:** Para generar especificaciones de producción, usa siempre el comando explícito `nx run openapi-tools:generate:production`.
-
-### Configuración requerida:
+### 🚀 Comandos principales:
 
 ```bash
-# Variables de entorno para los servicios
-export USERS_BACKEND_URL=https://users-api.example.com
-export ORDERS_BACKEND_URL=https://orders-api.example.com
+# Flujo completo de desarrollo (generar + desplegar + crear gateway)
+npm run gateway:dev
 
-# Variables opcionales para Google Cloud
-export GOOGLE_CLOUD_PROJECT=mi-proyecto-id
-export GOOGLE_CLIENT_ID=123456789.apps.googleusercontent.com
+# Flujo completo de producción
+npm run gateway:prod
+
+# Configuración inicial de Google Cloud (ejecutar solo una vez)
+npm run gcp:setup
 ```
 
-Más información detallada en `tools/openapi/README.md`.
+### ⚡ Características principales:
+
+- ✅ **Auto-discovery**: Detecta APIs automáticamente
+- ✅ **Extracción real**: Usa configuración real de Swagger de tus APIs NestJS
+- ✅ **Conversión automática**: OpenAPI 3.0 → Swagger 2.0 para Google Cloud
+- ✅ **Deploy integrado**: Crea gateway público con URL accesible
+- ✅ **Multi-entorno**: Soporte para desarrollo y producción
+
+### 📚 Documentación completa:
+
+**[👉 Ver documentación detallada del API Gateway](docs/API_GATEWAY.md)**
+
+Incluye guías de configuración, troubleshooting, arquitectura interna y mejores prácticas.
 
 ## Install Nx Console
 

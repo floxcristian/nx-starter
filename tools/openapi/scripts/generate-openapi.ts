@@ -1,32 +1,177 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * @fileoverview Generador de especificaciones OpenAPI para Google Cloud API Gateway
+ *
+ * Este generador extrae configuración REAL de Swagger desde aplicaciones NestJS,
+ * combina múltiples servicios en una especificación unificada y la optimiza
+ * para funcionar con Google Cloud API Gateway.
+ *
+ * CARACTERÍSTICAS PRINCIPALES:
+ * - ✅ Auto-discovery de servicios vía variables de entorno
+ * - ✅ Extracción real de OpenAPI desde código NestJS
+ * - ✅ Conversión automática OpenAPI 3.0 → Swagger 2.0
+ * - ✅ Configuración optimizada para Google Cloud
+ * - ✅ Validación robusta con Joi
+ * - ✅ Logging estructurado y mensajes útiles
+ *
+ * ESTRUCTURA DEL CÓDIGO:
+ * 1. 📋 TIPOS Y INTERFACES - Definiciones TypeScript centralizadas
+ * 2. 🔍 VALIDACIÓN - Esquemas Joi para entorno y configuración
+ * 3. 🚀 DESCUBRIMIENTO - Auto-discovery de servicios API
+ * 4. 📦 CARGA DE MÓDULOS - Importación dinámica de módulos NestJS
+ * 5. ⚙️  GENERACIÓN OPENAPI - Extracción desde código real
+ * 6. ☁️  GOOGLE CLOUD - Optimizaciones específicas
+ * 7. 💾 UTILIDADES - Funciones auxiliares
+ * 8. 🎯 ORQUESTADOR PRINCIPAL - Función main que coordina todo
+ *
+ * @author Equipo de Desarrollo
+ * @version 2.0.0 (Refactorizado y documentado)
+ * @since 2025-09-17
+ */
+
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder, OpenAPIObject } from '@nestjs/swagger';
 import { OpenAPIV3 } from 'openapi-types';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as YAML from 'yaml';
+import * as Joi from 'joi';
 const Converter = require('api-spec-converter');
 
-// --- INTERFACES Y CONFIGURACIÓN ---
-interface ServiceConfig {
+// ================================================================================================
+// 📋 SECCIÓN 1: TIPOS Y INTERFACES
+// ================================================================================================
+/**
+ * Representa un módulo de servicio NestJS que puede ser instanciado
+ * para la generación de documentación OpenAPI.
+ */
+interface ServiceModule {
+  /** Constructor del módulo */
+  new (...args: unknown[]): unknown;
+  /** Nombre del módulo para identificación */
   name: string;
-  module: any;
+}
+
+/**
+ * Error que puede ocurrir durante la conversión de OpenAPI 3.0 a Swagger 2.0
+ */
+interface ConversionError {
+  /** Mensaje descriptivo del error */
+  message?: string;
+}
+
+/**
+ * Resultado de la conversión de especificación OpenAPI
+ */
+interface ConversionResult {
+  /** Especificación resultante en formato Swagger 2.0 */
+  spec: SwaggerV2Document;
+  /** Lista de errores o advertencias durante la conversión */
+  errors?: ConversionError[];
+}
+
+/**
+ * Documento OpenAPI en formato Swagger 2.0 compatible con Google Cloud API Gateway
+ */
+interface SwaggerV2Document {
+  /** Versión de la especificación Swagger */
+  swagger: string;
+  /** Información básica de la API */
+  info: {
+    /** Título de la API */
+    title: string;
+    /** Descripción opcional de la API */
+    description?: string;
+    /** Versión de la API */
+    version: string;
+    /** Propiedades adicionales para Google Cloud */
+    [key: string]: unknown;
+  };
+  /** Paths y operaciones de la API */
+  paths?: Record<string, Record<string, unknown>>;
+  /** Definiciones de modelos de datos */
+  definitions?: Record<string, unknown>;
+  /** Definiciones de esquemas de seguridad */
+  securityDefinitions?: Record<string, SecurityDefinition>;
+  /** Configuración de seguridad global */
+  security?: Array<Record<string, string[]>>;
+  /** Propiedades adicionales */
+  [key: string]: unknown;
+}
+
+/**
+ * Definición de un esquema de seguridad para autenticación
+ */
+interface SecurityDefinition {
+  /** Tipo de autenticación (apiKey, oauth2, etc.) */
+  type: string;
+  /** Nombre del parámetro (para apiKey) */
+  name?: string;
+  /** Ubicación del parámetro (query, header, etc.) */
+  in?: string;
+  /** URL de autorización (para oauth2) */
+  authorizationUrl?: string;
+  /** Flujo de autorización (para oauth2) */
+  flow?: string;
+  /** Propiedades adicionales específicas de Google Cloud */
+  [key: string]: unknown;
+}
+
+/**
+ * Configuración de un servicio API individual
+ */
+interface ServiceConfig {
+  /** Nombre identificador del servicio */
+  name: string;
+  /** Módulo NestJS del servicio (cargado dinámicamente) */
+  module: ServiceModule | null;
+  /** Variable de entorno que contiene la URL del servicio */
   urlEnvVar: string;
+  /** Prefijo de path para las rutas del servicio */
   pathPrefix: string;
+  /** Título legible del servicio */
   title: string;
 }
 
+/**
+ * Configuración principal del generador OpenAPI
+ */
 interface Config {
+  /** Nombre del archivo de salida */
   outputFile: string;
+  /** Título del gateway API */
   gatewayTitle: string;
+  /** Descripción del gateway API */
   gatewayDescription: string;
+  /** Versión del gateway (formato semver) */
   gatewayVersion: string;
+  /** Protocolo de comunicación con los backends */
   protocol: string;
-  projectId?: string;
-  clientId?: string;
+  /** ID del proyecto de Google Cloud */
+  projectId: string;
 }
 
-// --- AUTO-DISCOVERY DE SERVICIOS ---
+// ================================================================================================
+// 🚀 SECCIÓN 3: DESCUBRIMIENTO AUTOMÁTICO DE SERVICIOS
+// ================================================================================================
+
+/**
+ * Descubre automáticamente los servicios API disponibles en el workspace
+ *
+ * Busca variables de entorno que terminen en '_BACKEND_URL' y verifica
+ * que existan las aplicaciones correspondientes en el filesystem.
+ *
+ * @returns Array de configuraciones de servicios descubiertos
+ *
+ * @example
+ * ```typescript
+ * // Con USERS_BACKEND_URL=https://api.example.com/users
+ * // y apps/api-users/ existente
+ * const services = discoverServices();
+ * console.log(services[0].name); // 'users'
+ * ```
+ *
+ * @throws {Error} Si no se encuentran servicios configurados
+ */
 function discoverServices(): ServiceConfig[] {
   console.log('🔍 Auto-descubriendo servicios API...');
 
@@ -90,6 +235,93 @@ function discoverServices(): ServiceConfig[] {
 // Obtener servicios dinámicamente
 const SERVICES = discoverServices();
 
+// ================================================================================================
+// 🔍 SECCIÓN 2: VALIDACIÓN CON JOI
+// ================================================================================================
+/**
+ * Esquema de validación para la configuración principal del generador
+ *
+ * Define las reglas de validación para todos los parámetros de configuración,
+ * incluyendo valores por defecto y patrones requeridos.
+ */
+const configSchema = Joi.object({
+  outputFile: Joi.string().min(1).default('openapi-gateway.yaml'),
+  gatewayTitle: Joi.string().min(1).default('Monorepo API Gateway'),
+  gatewayDescription: Joi.string()
+    .min(1)
+    .default('Gateway principal que unifica todos los microservicios.'),
+  gatewayVersion: Joi.string()
+    .pattern(/^\d+\.\d+\.\d+(-[a-zA-Z0-9-]+)?$/)
+    .default('1.0.0'),
+  protocol: Joi.string().valid('http', 'https').default('https'),
+  projectId: Joi.string().min(1).required(),
+});
+
+/**
+ * Esquema de validación para variables de entorno básicas del sistema
+ *
+ * Valida las variables de entorno requeridas y opcionales,
+ * permitiendo variables adicionales no especificadas.
+ */
+const environmentSchema = Joi.object({
+  // Variables dinámicas de servicios (se validan por separado)
+  GOOGLE_CLOUD_PROJECT: Joi.string().min(1).required(),
+  OPENAPI_OUTPUT_FILE: Joi.string().optional(),
+  GATEWAY_TITLE: Joi.string().optional(),
+  GATEWAY_DESCRIPTION: Joi.string().optional(),
+  GATEWAY_VERSION: Joi.string().optional(),
+  BACKEND_PROTOCOL: Joi.string().valid('http', 'https').optional(),
+}).unknown(true); // Permitir otras variables de entorno
+
+/**
+ * Valida las variables de entorno básicas del sistema
+ *
+ * Verifica que todas las variables de entorno requeridas estén presentes
+ * y tengan valores válidos según el esquema definido.
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   validateEnvironment();
+ *   console.log('✅ Variables de entorno válidas');
+ * } catch (error) {
+ *   console.error('❌ Error:', error.message);
+ * }
+ * ```
+ *
+ * @throws {Error} Si las variables de entorno no son válidas
+ */
+function validateEnvironment(): void {
+  console.log('🔍 Validando variables de entorno...');
+
+  const { error } = environmentSchema.validate(process.env);
+  if (error) {
+    console.error('❌ Error en variables de entorno:');
+    error.details.forEach((detail: Joi.ValidationErrorItem) => {
+      console.error(`   - ${detail.message}`);
+    });
+    console.error('\n💡 Variables requeridas:');
+    console.error('   export GOOGLE_CLOUD_PROJECT=tu-proyecto-id');
+    process.exit(1);
+  }
+}
+
+/**
+ * Construye la configuración final combinando argumentos CLI, variables de entorno y defaults
+ *
+ * Procesa los argumentos de línea de comandos, los combina con variables de entorno
+ * y aplica validación usando el esquema Joi definido.
+ *
+ * @returns Configuración validada y completa
+ *
+ * @example
+ * ```typescript
+ * const config = getConfig();
+ * console.log(`Generando ${config.gatewayTitle} v${config.gatewayVersion}`);
+ * ```
+ *
+ * @throws {Error} Si la configuración no es válida
+ */
 function getConfig(): Config {
   const args = process.argv.slice(2).reduce((acc, arg, index, arr) => {
     if (arg.startsWith('--')) {
@@ -101,29 +333,59 @@ function getConfig(): Config {
       acc[key] = value;
     }
     return acc;
-  }, {} as Record<string, any>);
+  }, {} as Record<string, string | boolean>);
 
-  return {
-    outputFile:
-      args['output'] ||
-      process.env['OPENAPI_OUTPUT_FILE'] ||
-      'openapi-gateway.yaml',
-    gatewayTitle:
-      args['title'] || process.env['GATEWAY_TITLE'] || 'Monorepo API Gateway',
+  const rawConfig = {
+    outputFile: args['output'] || process.env['OPENAPI_OUTPUT_FILE'],
+    gatewayTitle: args['title'] || process.env['GATEWAY_TITLE'],
     gatewayDescription:
-      args['description'] ||
-      process.env['GATEWAY_DESCRIPTION'] ||
-      'Gateway principal que unifica todos los microservicios.',
-    gatewayVersion:
-      args['version'] || process.env['GATEWAY_VERSION'] || '1.0.0',
-    protocol: args['protocol'] || process.env['BACKEND_PROTOCOL'] || 'https',
+      args['description'] || process.env['GATEWAY_DESCRIPTION'],
+    gatewayVersion: args['version'] || process.env['GATEWAY_VERSION'],
+    protocol: args['protocol'] || process.env['BACKEND_PROTOCOL'],
     projectId: args['project-id'] || process.env['GOOGLE_CLOUD_PROJECT'],
-    clientId: args['client-id'] || process.env['GOOGLE_CLIENT_ID'],
   };
+
+  const { error, value } = configSchema.validate(rawConfig);
+
+  if (error) {
+    console.error('❌ Error en configuración:');
+    error.details.forEach((detail: Joi.ValidationErrorItem) => {
+      console.error(`   - ${detail.message}`);
+    });
+    console.error('\n💡 Verifica tus variables de entorno o argumentos CLI');
+    process.exit(1);
+  }
+
+  return value as Config;
 }
 
-// --- CARGA DINÁMICA DE MÓDULOS ---
-async function loadAppModule(serviceName: string): Promise<any> {
+// ================================================================================================
+// 📦 SECCIÓN 4: CARGA DINÁMICA DE MÓDULOS NESTJS
+// ================================================================================================
+
+/**
+ * Carga dinámicamente el módulo de una aplicación NestJS
+ *
+ * Intenta cargar desde diferentes ubicaciones en orden de prioridad:
+ * 1. Módulo principal de la app (apps/api-{service}/src/app/app.module)
+ * 2. Módulo de dominio (libs/{service}-domain/src/lib/{service}-domain.module)
+ *
+ * @param serviceName - Nombre del servicio a cargar
+ * @returns Promise que resuelve al módulo cargado
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   const module = await loadAppModule('users');
+ *   console.log(`Módulo cargado: ${module.name}`);
+ * } catch (error) {
+ *   console.error('Error cargando módulo:', error.message);
+ * }
+ * ```
+ *
+ * @throws {Error} Si no se puede cargar el módulo desde ninguna ubicación
+ */
+async function loadAppModule(serviceName: string): Promise<ServiceModule> {
   try {
     // Intentar cargar desde diferentes ubicaciones
     const possiblePaths = [
@@ -173,9 +435,31 @@ async function loadAppModule(serviceName: string): Promise<any> {
   }
 }
 
-// --- MOTOR DE GENERACIÓN REAL ---
+// ================================================================================================
+// ⚙️ SECCIÓN 5: GENERACIÓN DE ESPECIFICACIONES OPENAPI
+// ================================================================================================
+
+/**
+ * Genera un documento Swagger/OpenAPI desde un módulo NestJS
+ *
+ * Crea una aplicación NestJS temporal, configura Swagger y extrae
+ * la especificación OpenAPI generada desde el código real.
+ *
+ * @param appModule - Módulo NestJS a procesar
+ * @param title - Título para la documentación
+ * @returns Promise que resuelve al documento OpenAPI generado
+ *
+ * @example
+ * ```typescript
+ * const UsersModule = await import('./users.module');
+ * const doc = await buildSwagger(UsersModule.AppModule, 'Users API');
+ * console.log(`Generado documento con ${Object.keys(doc.paths).length} paths`);
+ * ```
+ *
+ * @throws {Error} Si falla la creación de la aplicación o generación del documento
+ */
 const buildSwagger = async (
-  appModule: any,
+  appModule: ServiceModule,
   title: string
 ): Promise<OpenAPIObject> => {
   console.log(`   🏗️  Creando aplicación NestJS para ${title}...`);
@@ -201,29 +485,62 @@ const buildSwagger = async (
   return document;
 };
 
-// --- VALIDACIÓN DE VARIABLES DE ENTORNO ---
-function validateEnvironmentVariables(): Record<string, string> {
+/**
+ * Valida y obtiene las URLs de todos los servicios descubiertos
+ *
+ * Verifica que todas las URLs de servicios sean válidas y accesibles,
+ * proporcionando mensajes de error útiles y ejemplos cuando fallan.
+ *
+ * @returns Objeto con las URLs validadas mapeadas por variable de entorno
+ *
+ * @example
+ * ```typescript
+ * const validUrls = validateServiceUrls();
+ * console.log(validUrls['USERS_BACKEND_URL']); // "https://api.example.com/users"
+ * ```
+ *
+ * @throws {Error} Si alguna URL no es válida
+ */
+function validateServiceUrls(): Record<string, string> {
+  console.log('🔍 Validando URLs de servicios...');
+
   const envVars: Record<string, string> = {};
-  const missingVars: string[] = [];
+  const errors: string[] = [];
 
   for (const service of SERVICES) {
     const value = process.env[service.urlEnvVar];
+
     if (!value) {
-      missingVars.push(service.urlEnvVar);
-    } else {
-      envVars[service.urlEnvVar] = value;
+      errors.push(`${service.urlEnvVar} es requerida`);
+      continue;
     }
+
+    // Validar que sea una URL válida
+    const urlSchema = Joi.string()
+      .uri({ scheme: ['http', 'https'] })
+      .required();
+    const { error } = urlSchema.validate(value);
+
+    if (error) {
+      errors.push(
+        `${service.urlEnvVar} debe ser una URL válida (http/https): ${value}`
+      );
+      continue;
+    }
+
+    envVars[service.urlEnvVar] = value;
   }
 
-  if (missingVars.length > 0) {
-    console.error(
-      `❌ Error: Las siguientes variables de entorno son requeridas: ${missingVars.join(
-        ', '
-      )}`
-    );
-    console.error('Ejemplo:');
-    missingVars.forEach((varName) => {
-      console.error(`export ${varName}=https://your-service-url.com`);
+  if (errors.length > 0) {
+    console.error('❌ Errores en URLs de servicios:');
+    errors.forEach((error) => {
+      console.error(`   - ${error}`);
+    });
+    console.error('\n💡 Ejemplo de URLs válidas:');
+    SERVICES.forEach((service) => {
+      console.error(
+        `   export ${service.urlEnvVar}=https://api-${service.name}-xxx.run.app/api`
+      );
     });
     process.exit(1);
   }
@@ -231,12 +548,32 @@ function validateEnvironmentVariables(): Record<string, string> {
   return envVars;
 }
 
-// --- CONFIGURACIÓN DE GOOGLE CLOUD ---
+// ================================================================================================
+// ☁️ SECCIÓN 6: OPTIMIZACIONES PARA GOOGLE CLOUD API GATEWAY
+// ================================================================================================
+
+/**
+ * Mejora una especificación Swagger 2.0 con configuraciones específicas de Google Cloud
+ *
+ * Añade metadatos de gestión, endpoints, esquemas de seguridad y configuración
+ * de backends necesarios para el funcionamiento en Google Cloud API Gateway.
+ *
+ * @param spec - Especificación Swagger 2.0 base
+ * @param envVars - URLs validadas de los servicios backend
+ * @param config - Configuración del gateway
+ * @returns Especificación mejorada para Google Cloud
+ *
+ * @example
+ * ```typescript
+ * const enhanced = enhanceSpecForGoogleCloud(baseSpec, serviceUrls, config);
+ * console.log('Especificación optimizada para Google Cloud');
+ * ```
+ */
 function enhanceSpecForGoogleCloud(
-  spec: any,
+  spec: SwaggerV2Document,
   envVars: Record<string, string>,
   config: Config
-): any {
+): SwaggerV2Document {
   const enhancedSpec = { ...spec };
 
   // Configuración de gestión para Google Cloud
@@ -282,7 +619,7 @@ function enhanceSpecForGoogleCloud(
     enhancedSpec.securityDefinitions = {};
   }
 
-  const securitySchemes: Record<string, any> = {
+  const securitySchemes: Record<string, SecurityDefinition> = {
     // Google Cloud API Gateway solo acepta estos formatos específicos
     api_key: {
       type: 'apiKey',
@@ -297,28 +634,15 @@ function enhanceSpecForGoogleCloud(
     },
   };
 
-  if (config.clientId) {
-    securitySchemes['google_id_token'] = {
-      type: 'oauth2',
-      authorizationUrl: 'https://accounts.google.com/o/oauth2/auth',
-      flow: 'implicit',
-      'x-google-issuer': 'https://accounts.google.com',
-      'x-google-jwks_uri': 'https://www.googleapis.com/oauth2/v3/certs',
-      'x-google-audiences': config.clientId,
-    };
-  }
-
-  if (config.projectId) {
-    securitySchemes['firebase_auth'] = {
-      type: 'oauth2',
-      authorizationUrl: `https://securetoken.google.com/${config.projectId}`,
-      flow: 'implicit',
-      'x-google-issuer': `https://securetoken.google.com/${config.projectId}`,
-      'x-google-jwks_uri':
-        'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com',
-      'x-google-audiences': config.projectId,
-    };
-  }
+  securitySchemes['firebase_auth'] = {
+    type: 'oauth2',
+    authorizationUrl: `https://securetoken.google.com/${config.projectId}`,
+    flow: 'implicit',
+    'x-google-issuer': `https://securetoken.google.com/${config.projectId}`,
+    'x-google-jwks_uri':
+      'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com',
+    'x-google-audiences': config.projectId,
+  };
 
   Object.assign(enhancedSpec.securityDefinitions, securitySchemes);
 
@@ -375,21 +699,78 @@ function enhanceSpecForGoogleCloud(
   return enhancedSpec;
 }
 
-// --- FUNCIÓN PRINCIPAL ---
-async function generateSpec() {
-  const config = getConfig();
+// ================================================================================================
+// 💾 SECCIÓN 7: UTILIDADES DE APOYO
+// ================================================================================================
 
-  console.log('🔍 Validando variables de entorno...');
-  const envVars = validateEnvironmentVariables();
+/**
+ * Muestra estadísticas de la especificación generada
+ *
+ * @param filePath - Ruta del archivo generado
+ * @param pathCount - Número de paths en la especificación
+ * @param definitionCount - Número de definiciones en la especificación
+ */
+function logSpecificationStats(
+  filePath: string,
+  pathCount: number,
+  definitionCount: number
+): void {
+  console.log(`✅ Especificación OpenAPI generada con éxito:`);
+  console.log(`   📄 Archivo: ${filePath}`);
+  console.log(`   📊 Paths: ${pathCount}`);
+  console.log(`   🧩 Definitions: ${definitionCount}`);
+}
+
+/**
+ * Muestra los próximos pasos recomendados después de la generación
+ *
+ * @param outputFile - Nombre del archivo generado
+ */
+function logNextSteps(outputFile: string): void {
+  const isDev = outputFile.includes('dev');
+  const environment = isDev ? 'dev' : 'prod';
+
+  console.log('\n📚 Próximos pasos:');
+  console.log(`   Desplegar: npm run gateway:deploy:${environment}`);
+  console.log(`   Gateway completo: npm run gateway:${environment}`);
+}
+
+// ================================================================================================
+// 🎯 SECCIÓN 8: ORQUESTADOR PRINCIPAL
+// ================================================================================================
+
+/**
+ * Función principal del generador de OpenAPI
+ *
+ * Orquesta todo el proceso de generación desde el descubrimiento de servicios
+ * hasta la escritura del archivo final optimizado para Google Cloud.
+ *
+ * PROCESO COMPLETO:
+ * 1. 🔍 Validación de entorno y configuración
+ * 2. 🚀 Descubrimiento de servicios disponibles
+ * 3. 📦 Carga dinámica de módulos NestJS
+ * 4. ⚙️  Generación de especificaciones desde código real
+ * 5. 🔗 Combinación de múltiples servicios
+ * 6. 🔄 Conversión OpenAPI 3.0 → Swagger 2.0
+ * 7. ☁️  Optimización para Google Cloud API Gateway
+ * 8. 💾 Escritura del archivo final
+ *
+ * @returns Promise que resuelve cuando la generación se completa exitosamente
+ *
+ * @throws {Error} Si ocurre cualquier error durante el proceso
+ */
+async function generateSpec() {
+  // Validar entorno y configuración
+  validateEnvironment();
+  const config = getConfig();
+  const envVars = validateServiceUrls();
 
   console.log('📋 Configuración detectada:');
   console.log(`   - Título: ${config.gatewayTitle}`);
   console.log(`   - Versión: ${config.gatewayVersion}`);
   console.log(`   - Archivo de salida: ${config.outputFile}`);
   console.log(`   - Protocolo: ${config.protocol}`);
-  if (config.projectId)
-    console.log(`   - Google Cloud Project: ${config.projectId}`);
-  if (config.clientId) console.log(`   - Google Client ID: ${config.clientId}`);
+  console.log(`   - Google Cloud Project: ${config.projectId}`);
 
   console.log('📡 URLs de servicios:');
   SERVICES.forEach((service) => {
@@ -414,6 +795,9 @@ async function generateSpec() {
     SERVICES.map(async (service) => {
       console.log(`🔧 Procesando ${service.title}...`);
       try {
+        if (!service.module) {
+          throw new Error(`Módulo no cargado para ${service.title}`);
+        }
         const doc = await buildSwagger(service.module, service.title);
         console.log(`   ✅ ${service.title} completado`);
         return doc;
@@ -474,7 +858,7 @@ async function generateSpec() {
     '⚙️ Convirtiendo OpenAPI 3.0 → Swagger 2.0 (para Google Cloud)...'
   );
 
-  let finalCombinedSpec: any;
+  let finalCombinedSpec: SwaggerV2Document;
   try {
     const converter = Converter.convert({
       from: 'openapi_3',
@@ -482,10 +866,10 @@ async function generateSpec() {
       source: combinedOpenAPI3,
     });
 
-    const result = await converter;
+    const result = (await converter) as ConversionResult;
     if (result.errors && result.errors.length > 0) {
       console.warn('⚠️ Advertencias durante la conversión:');
-      result.errors.forEach((error: any) => {
+      result.errors.forEach((error: ConversionError) => {
         console.warn(`   - ${error.message || error}`);
       });
     }
@@ -502,9 +886,10 @@ async function generateSpec() {
 
   // Limpiar security definitions incompatibles con Google Cloud
   console.log('🧹 Limpiando security definitions para Google Cloud...');
-  if (finalCombinedSpec.securityDefinitions) {
-    Object.keys(finalCombinedSpec.securityDefinitions).forEach((key) => {
-      const secDef = finalCombinedSpec.securityDefinitions[key];
+  const securityDefinitions = finalCombinedSpec.securityDefinitions;
+  if (securityDefinitions) {
+    Object.keys(securityDefinitions).forEach((key) => {
+      const secDef = securityDefinitions[key];
       if (secDef.type === 'apiKey') {
         const isValidApiKey =
           (secDef.name === 'key' && secDef.in === 'query') ||
@@ -515,14 +900,14 @@ async function generateSpec() {
           console.log(
             `   ⚠️ Removiendo security definition incompatible: ${key} (name: ${secDef.name}, in: ${secDef.in})`
           );
-          delete finalCombinedSpec.securityDefinitions[key];
+          delete securityDefinitions[key];
         }
       } else if (secDef.type !== 'oauth2') {
         // Remover otros tipos no soportados
         console.log(
           `   ⚠️ Removiendo security definition no soportado: ${key} (type: ${secDef.type})`
         );
-        delete finalCombinedSpec.securityDefinitions[key];
+        delete securityDefinitions[key];
       }
     });
   }
@@ -540,25 +925,14 @@ async function generateSpec() {
   const outputPath = path.resolve(config.outputFile);
   fs.writeFileSync(outputPath, YAML.stringify(finalSpec), 'utf8');
 
-  console.log(`✅ Especificación OpenAPI generada con éxito:`);
-  console.log(`   📄 Archivo: ${outputPath}`);
-  console.log(`   📊 Paths: ${Object.keys(finalSpec.paths || {}).length}`);
-  console.log(
-    `   🧩 Definitions: ${Object.keys(finalSpec.definitions || {}).length}`
+  // Mostrar estadísticas y próximos pasos
+  logSpecificationStats(
+    outputPath,
+    Object.keys(finalSpec.paths || {}).length,
+    Object.keys(finalSpec.definitions || {}).length
   );
 
-  // Mostrar comandos útiles
-  console.log('\n📚 Próximos pasos:');
-  console.log(
-    `   Desplegar: npm run gateway:deploy:${
-      config.outputFile.includes('dev') ? 'dev' : 'prod'
-    }`
-  );
-  console.log(
-    `   Gateway completo: npm run gateway:${
-      config.outputFile.includes('dev') ? 'dev' : 'prod'
-    }`
-  );
+  logNextSteps(config.outputFile);
 }
 
 // --- FUNCIÓN PRINCIPAL CON MANEJO DE ERRORES ---
@@ -579,7 +953,6 @@ OPTIONS:
   --version <version>     Versión del gateway (default: 1.0.0)
   --protocol <protocol>   Protocolo de backend (default: https)
   --project-id <id>       Google Cloud Project ID (para Firebase Auth)
-  --client-id <id>        Google OAuth Client ID (para Google Auth)
   --help                  Mostrar esta ayuda
 
 VARIABLES DE ENTORNO REQUERIDAS:

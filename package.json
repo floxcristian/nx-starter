@@ -98,6 +98,7 @@
     "jest-environment-node": "^30.0.2",
     "jest-preset-angular": "~15.0.0",
     "jest-util": "^30.0.2",
+    "joi": "^18.0.1",
     "jsonc-eslint-parser": "^2.1.0",
     "nx": "21.5.1",
     "openapi-types": "^12.1.3",
