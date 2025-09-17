@@ -548,10 +548,16 @@ async function generateSpec() {
   );
 
   // Mostrar comandos útiles
-  console.log('\n📚 Comandos útiles:');
-  console.log(`   Validar: swagger-codegen validate -i ${config.outputFile}`);
+  console.log('\n📚 Próximos pasos:');
   console.log(
-    `   Desplegar: gcloud api-gateway api-configs create CONFIG_ID --api=API_ID --openapi-spec=${config.outputFile}`
+    `   Desplegar: npm run gateway:deploy:${
+      config.outputFile.includes('dev') ? 'dev' : 'prod'
+    }`
+  );
+  console.log(
+    `   Gateway completo: npm run gateway:${
+      config.outputFile.includes('dev') ? 'dev' : 'prod'
+    }`
   );
 }
 
@@ -582,9 +588,9 @@ VARIABLES DE ENTORNO REQUERIDAS:
 
 CARACTERÍSTICAS:
   ✅ Extrae configuración REAL de Swagger de tus APIs NestJS
-  ✅ Combina múltiples servicios en un gateway unificado
+  ✅ Auto-discovery de servicios vía variables de entorno
+  ✅ Conversión automática OpenAPI 3.0 → Swagger 2.0
   ✅ Configuración optimizada para Google Cloud API Gateway
-  ✅ Manejo robusto de errores y logging detallado
 `);
     process.exit(0);
   }

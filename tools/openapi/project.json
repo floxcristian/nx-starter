@@ -18,35 +18,35 @@
         "cwd": "{workspaceRoot}"
       }
     },
-    "validate:dev": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "node tools/openapi/scripts/validate-swagger.js openapi-gateway-dev.yaml",
-        "cwd": "{workspaceRoot}"
-      }
-    },
-    "validate:prod": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "node tools/openapi/scripts/validate-swagger.js openapi-gateway-prod.yaml",
-        "cwd": "{workspaceRoot}"
-      }
-    },
     "deploy:dev": {
       "executor": "nx:run-commands",
       "options": {
         "command": "gcloud api-gateway api-configs create config-dev-$(date +%s) --api=monorepo-gateway --openapi-spec=openapi-gateway-dev.yaml",
         "cwd": "{workspaceRoot}"
-      },
-      "dependsOn": ["validate:dev"]
+      }
     },
     "deploy:prod": {
       "executor": "nx:run-commands",
       "options": {
         "command": "gcloud api-gateway api-configs create config-prod-$(date +%s) --api=monorepo-gateway --openapi-spec=openapi-gateway-prod.yaml",
         "cwd": "{workspaceRoot}"
-      },
-      "dependsOn": ["validate:prod"]
+      }
+    },
+    "gateway:dev": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["deploy:dev"],
+      "options": {
+        "command": "bash tools/scripts/create-gateway.sh dev",
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "gateway:prod": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["deploy:prod"],
+      "options": {
+        "command": "bash tools/scripts/create-gateway.sh prod",
+        "cwd": "{workspaceRoot}"
+      }
     },
     "lint": {
       "executor": "@nx/eslint:lint",

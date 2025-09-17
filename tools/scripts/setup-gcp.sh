@@ -137,7 +137,31 @@ echo "✅ Workload Identity Federation configurado"
 echo "------------------------------------------------------------------"
 
 # ==============================================================================
-# 8. OBTENER VALORES FINALES Y MOSTRAR
+# 8. CONFIGURAR API GATEWAY
+# ==============================================================================
+echo "🌐 Configurando API Gateway..."
+
+# Crear API si no existe
+echo "   -> Verificando API 'monorepo-gateway'..."
+if ! gcloud api-gateway apis describe monorepo-gateway --project="${GCP_PROJECT_ID}" >/dev/null 2>&1; then
+  echo "   -> Creando API 'monorepo-gateway'..."
+  gcloud api-gateway apis create monorepo-gateway \
+    --project="${GCP_PROJECT_ID}" \
+    --display-name="Monorepo API Gateway"
+else
+  echo "   -> La API 'monorepo-gateway' ya existe."
+fi
+
+echo "✅ API Gateway configurado"
+echo ""
+echo "📋 Para completar el setup:"
+echo "   1. Genera el spec: npm run openapi:generate:dev"
+echo "   2. Despliega config: npm run gateway:deploy:dev"
+echo "   3. Crea gateway: bash tools/scripts/create-gateway.sh dev"
+echo "------------------------------------------------------------------"
+
+# ==============================================================================
+# 9. OBTENER VALORES FINALES Y MOSTRAR
 # ==============================================================================
 echo "📋 Obteniendo valores finales para GitHub..."
 PROVIDER_FULL_NAME=$(gcloud iam workload-identity-pools providers describe "${GCLOUD_IDENTITY_PROVIDER}" \

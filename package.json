@@ -22,10 +22,12 @@
     "gcp:setup": "bash ./tools/scripts/setup-gcp.sh",
     "openapi:generate:dev": "nx run openapi-tools:generate:dev",
     "openapi:generate:prod": "nx run openapi-tools:generate:prod",
-    "openapi:validate:dev": "nx run openapi-tools:validate:dev",
-    "openapi:validate:prod": "nx run openapi-tools:validate:prod",
     "gateway:deploy:dev": "nx run openapi-tools:deploy:dev",
-    "gateway:deploy:prod": "nx run openapi-tools:deploy:prod"
+    "gateway:deploy:prod": "nx run openapi-tools:deploy:prod",
+    "gateway:create:dev": "nx run openapi-tools:gateway:dev",
+    "gateway:create:prod": "nx run openapi-tools:gateway:prod",
+    "gateway:dev": "npm run openapi:generate:dev && npm run gateway:deploy:dev && npm run gateway:create:dev",
+    "gateway:prod": "npm run openapi:generate:prod && npm run gateway:deploy:prod && npm run gateway:create:prod"
   },
   "private": true,
   "dependencies": {
