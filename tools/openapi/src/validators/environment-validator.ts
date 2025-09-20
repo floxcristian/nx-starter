@@ -24,11 +24,13 @@ export function validateEnvironment(): void {
 
   const requiredVars = [
     'GOOGLE_CLOUD_PROJECT',
+    'GATEWAY_API_NAME',
     'OPENAPI_OUTPUT_FILE',
     'GATEWAY_TITLE',
     'GATEWAY_DESCRIPTION',
     'GATEWAY_VERSION',
     'BACKEND_PROTOCOL',
+    'ENVIRONMENT',
   ];
 
   const missingVars = requiredVars.filter((varName) => !process.env[varName]);
@@ -40,11 +42,13 @@ export function validateEnvironment(): void {
     });
     console.error('\n💡 Variables requeridas:');
     console.error('   export GOOGLE_CLOUD_PROJECT=tu-proyecto-id');
+    console.error('   export GATEWAY_API_NAME=mi-api-gateway');
     console.error('   export OPENAPI_OUTPUT_FILE=openapi-gateway.yaml');
     console.error('   export GATEWAY_TITLE="Mi API Gateway"');
     console.error('   export GATEWAY_DESCRIPTION="Descripción del gateway"');
     console.error('   export GATEWAY_VERSION=1.0.0');
     console.error('   export BACKEND_PROTOCOL=https');
+    console.error('   export ENVIRONMENT=dev');
     process.exit(1);
   }
 }

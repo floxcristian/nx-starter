@@ -12,6 +12,7 @@ GITHUB_OWNER="floxcristian"                  # El dueño del repositorio (usuari
 GCP_REGION="southamerica-west1" # Elige la misma región que usarás en el workflow
 GAR_REPOSITORY="nx-starter" # El nombre que tendrá tu repositorio de imágenes
 GCLOUD_SERVICE_ACCOUNT="nx-starter-gha-deployer" # El nombre para tu cuenta de servicio
+GATEWAY_API_NAME="$GATEWAY_API_NAME" # Nombre del API Gateway
 
 # --- Nombres para Workload Identity Federation (no tocar a menos que sepas lo que haces) ---
 GCLOUD_IDENTITY_POOL="github-pool"
@@ -20,9 +21,19 @@ GCLOUD_IDENTITY_PROVIDER="github-provider"
 # --- Variables Calculadas (no tocar) ---
 GCLOUD_SERVICE_ACCOUNT_EMAIL="${GCLOUD_SERVICE_ACCOUNT}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
 
+# --- Validar variables requeridas ---
+if [ -z "${GATEWAY_API_NAME}" ]; then
+    echo "❌ Error: Variable GATEWAY_API_NAME no está configurada"
+    echo ""
+    echo "💡 Configúrala con:"
+    echo "   export GATEWAY_API_NAME=mi-api-gateway"
+    exit 1
+fi
+
 echo "🚀 Iniciando configuración de CI/CD y API Gateway para:"
 echo "   📁 Proyecto: ${GCP_PROJECT_ID}"
 echo "   🐙 Repositorio: ${GITHUB_REPO}"
+echo "   🌐 API Gateway: ${GATEWAY_API_NAME}"
 echo "------------------------------------------------------------------"
 
 # ==============================================================================
@@ -142,14 +153,14 @@ echo "------------------------------------------------------------------"
 echo "🌐 Configurando API Gateway..."
 
 # Crear API si no existe
-echo "   -> Verificando API 'monorepo-gateway'..."
-if ! gcloud api-gateway apis describe monorepo-gateway --project="${GCP_PROJECT_ID}" >/dev/null 2>&1; then
-  echo "   -> Creando API 'monorepo-gateway'..."
-  gcloud api-gateway apis create monorepo-gateway \
+echo "   -> Verificando API '${GATEWAY_API_NAME}'..."
+if ! gcloud api-gateway apis describe ${GATEWAY_API_NAME} --project="${GCP_PROJECT_ID}" >/dev/null 2>&1; then
+  echo "   -> Creando API '${GATEWAY_API_NAME}'..."
+  gcloud api-gateway apis create ${GATEWAY_API_NAME} \
     --project="${GCP_PROJECT_ID}" \
     --display-name="Monorepo API Gateway"
 else
-  echo "   -> La API 'monorepo-gateway' ya existe."
+  echo "   -> La API '${GATEWAY_API_NAME}' ya existe."
 fi
 
 echo "✅ API Gateway configurado"

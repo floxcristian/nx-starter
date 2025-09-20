@@ -89,15 +89,15 @@ npm run gateway:prod
 🎉 ¡GATEWAY CONFIGURADO EXITOSAMENTE! 🎉
 
 📡 Información del Gateway:
-   🏷️  Nombre: monorepo-gateway-dev
-   🔗 API: monorepo-gateway
+   🏷️  Nombre: mi-empresa-api-dev
+   🔗 API: mi-empresa-api
    ⚙️  Config: config-dev-1758118214
    🌍 Región: us-central1
-   🔗 URL: https://monorepo-gateway-dev-xxxxx.uc.gateway.dev
+   🔗 URL: https://mi-empresa-api-dev-xxxxx.uc.gateway.dev
 
 🧪 Prueba tus endpoints:
-   curl -H "x-api-key: TU_API_KEY" https://monorepo-gateway-dev-xxxxx.uc.gateway.dev/users
-   curl -H "x-api-key: TU_API_KEY" https://monorepo-gateway-dev-xxxxx.uc.gateway.dev/orders
+   curl -H "x-api-key: TU_API_KEY" https://mi-empresa-api-dev-xxxxx.uc.gateway.dev/users
+   curl -H "x-api-key: TU_API_KEY" https://mi-empresa-api-dev-xxxxx.uc.gateway.dev/orders
 ```
 
 ---
@@ -145,7 +145,7 @@ npm run gateway:prod
 **Ejemplo de ejecución:**
 
 ```bash
-node tools/openapi/scripts/generate-openapi.ts --output openapi-gateway-dev.yaml --protocol http
+node tools/openapi/scripts/generate-openapi.ts --output ${OPENAPI_OUTPUT_FILE} --protocol http
 ```
 
 ### **2. Gestor de Gateway (`create-gateway.sh`)**
@@ -188,6 +188,7 @@ USERS_BACKEND_URL=https://api-users-xxx.run.app/api
 ORDERS_BACKEND_URL=https://api-orders-xxx.run.app/api
 
 # Configuración del gateway
+GATEWAY_API_NAME=mi-empresa-api           # Nombre del API en Google Cloud
 BACKEND_PROTOCOL=https                    # http para dev, https para prod
 GATEWAY_TITLE="Mi API Gateway"
 GATEWAY_VERSION=1.0.0
@@ -304,7 +305,7 @@ PAYMENTS_BACKEND_URL=https://api-payments-xxx.run.app/api
 
 ```bash
 # Ver configuraciones existentes
-gcloud api-gateway api-configs list --api=monorepo-gateway
+gcloud api-gateway api-configs list --api=${GATEWAY_API_NAME}
 
 # Ver gateways existentes
 gcloud api-gateway gateways list --location=us-central1
@@ -322,7 +323,7 @@ Si quieres validar el spec manualmente:
 npm run openapi:generate:dev
 
 # Validar en Swagger Editor online
-# Copia el contenido de openapi-gateway-dev.yaml
+# Copia el contenido del archivo especificado en OPENAPI_OUTPUT_FILE
 # Pégalo en: https://editor.swagger.io/
 ```
 

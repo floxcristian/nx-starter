@@ -27,6 +27,7 @@ show_help() {
     echo "Variables de entorno requeridas:"
     echo "  USERS_BACKEND_URL    URL del servicio de usuarios"
     echo "  ORDERS_BACKEND_URL   URL del servicio de órdenes"
+    echo "  GATEWAY_API_NAME     Nombre de la API en Google Cloud API Gateway"
     echo ""
     echo "Ejemplos:"
     echo "  $0 dev                           # Generar para desarrollo"
@@ -100,6 +101,9 @@ fi
 if [[ -z "$ORDERS_BACKEND_URL" ]]; then
     MISSING_VARS+=("ORDERS_BACKEND_URL")
 fi
+if [[ -z "$GATEWAY_API_NAME" ]]; then
+    MISSING_VARS+=("GATEWAY_API_NAME")
+fi
 
 if [[ ${#MISSING_VARS[@]} -gt 0 ]]; then
     echo "❌ Faltan las siguientes variables de entorno:"
@@ -117,23 +121,13 @@ nx build users-domain orders-domain
 # Generar especificación
 echo "🚀 Ejecutando el generador..."
 
-if [[ "$ENVIRONMENT" == "prod" ]]; then
-    node_modules/.bin/ts-node --project tools/openapi/tsconfig.json tools/openapi/src/index.ts \
-        --output "openapi-gateway-prod.yaml" \
-        --title "Monorepo API Gateway" \
-        --protocol "https"
-else
-    node_modules/.bin/ts-node --project tools/openapi/tsconfig.json tools/openapi/src/index.ts \
-        --output "openapi-gateway-dev.yaml" \
-        --title "Monorepo API Gateway (Development)" \
-        --protocol "http"
-fi
+node_modules/.bin/ts-node --project tools/openapi/tsconfig.json tools/openapi/src/index.ts
 
 # Validar si se solicitó
 if [[ "$VALIDATE" == true ]]; then
     echo "✅ Validando especificación..."
     
-    OUTPUT_FILE="openapi-gateway-$ENVIRONMENT.yaml"
+    OUTPUT_FILE="$OPENAPI_OUTPUT_FILE"
     
     # Verificar swagger-codegen
     if command -v swagger-codegen &> /dev/null; then
@@ -163,9 +157,9 @@ if [[ "$DEPLOY" == true ]]; then
         exit 1
     fi
     
-    OUTPUT_FILE="openapi-gateway-$ENVIRONMENT.yaml"
+    OUTPUT_FILE="$OPENAPI_OUTPUT_FILE"
     CONFIG_ID="config-$(date +%s)"
-    API_ID="monorepo-gateway"
+    API_ID="$GATEWAY_API_NAME"
     
     echo "   API ID: $API_ID"
     echo "   Config ID: $CONFIG_ID"

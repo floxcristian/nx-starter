@@ -21,14 +21,14 @@
     "deploy:dev": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "gcloud api-gateway api-configs create config-dev-$(date +%s) --api=monorepo-gateway --openapi-spec=openapi-gateway-dev.yaml",
+        "command": "gcloud api-gateway api-configs create config-dev-$(date +%s) --api=${GATEWAY_API_NAME} --openapi-spec=${OPENAPI_OUTPUT_FILE}",
         "cwd": "{workspaceRoot}"
       }
     },
     "deploy:prod": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "gcloud api-gateway api-configs create config-prod-$(date +%s) --api=monorepo-gateway --openapi-spec=openapi-gateway-prod.yaml",
+        "command": "gcloud api-gateway api-configs create config-prod-$(date +%s) --api=${GATEWAY_API_NAME} --openapi-spec=${OPENAPI_OUTPUT_FILE}",
         "cwd": "{workspaceRoot}"
       }
     },

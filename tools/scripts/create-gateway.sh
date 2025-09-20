@@ -8,7 +8,7 @@ set -e
 # --- Configuración ---
 GCP_PROJECT_ID=$(gcloud config get-value project)
 GCP_REGION="us-central1"  # API Gateway disponible aquí
-API_NAME="monorepo-gateway"
+API_NAME="$GATEWAY_API_NAME"
 
 # --- Validar argumentos ---
 if [ $# -ne 1 ]; then
@@ -33,6 +33,15 @@ GATEWAY_NAME="${API_NAME}-${ENVIRONMENT}"
 if [[ "$ENVIRONMENT" != "dev" && "$ENVIRONMENT" != "prod" ]]; then
     echo "❌ Error: Entorno '$ENVIRONMENT' no válido"
     echo "Usa 'dev' o 'prod'"
+    exit 1
+fi
+
+# --- Validar variable requerida ---
+if [[ -z "$GATEWAY_API_NAME" ]]; then
+    echo "❌ Error: Variable GATEWAY_API_NAME no está configurada"
+    echo ""
+    echo "💡 Configúrala con:"
+    echo "   export GATEWAY_API_NAME=mi-api-gateway"
     exit 1
 fi
 

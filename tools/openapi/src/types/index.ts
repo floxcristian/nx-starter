@@ -103,6 +103,8 @@ export interface ServiceConfig {
 export interface Config {
   /** Nombre del archivo de salida */
   outputFile: string;
+  /** Nombre de la API en Google Cloud API Gateway */
+  gatewayApiName: string;
   /** Título del gateway API */
   gatewayTitle: string;
   /** Descripción del gateway API */
@@ -113,6 +115,8 @@ export interface Config {
   protocol: string;
   /** ID del proyecto de Google Cloud */
   projectId: string;
+  /** Entorno target para deployment */
+  environment: 'dev' | 'prod';
 }
 
 /**
@@ -152,16 +156,6 @@ export const CONSTANTS = {
     YAML: '.yaml',
     YML: '.yml',
     JSON: '.json',
-  } as const,
-
-  /** Configuración por defecto */
-  DEFAULTS: {
-    OUTPUT_FILE: 'openapi-gateway.yaml',
-    GATEWAY_TITLE: 'Monorepo API Gateway',
-    GATEWAY_DESCRIPTION:
-      'Gateway principal que unifica todos los microservicios.',
-    GATEWAY_VERSION: '1.0.0',
-    PROTOCOL: 'https',
   } as const,
 } as const;
 

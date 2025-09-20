@@ -14,6 +14,12 @@ import { Config, ParsedCliArgs } from '../types/index';
 export const configSchema = Joi.object({
   outputFile: Joi.string().min(1).required(),
 
+  gatewayApiName: Joi.string()
+    .pattern(/^[a-z][a-z0-9-]*[a-z0-9]$/)
+    .min(1)
+    .max(63)
+    .required(),
+
   gatewayTitle: Joi.string().min(1).required(),
 
   gatewayDescription: Joi.string().min(1).required(),
@@ -25,6 +31,8 @@ export const configSchema = Joi.object({
   protocol: Joi.string().valid('http', 'https').required(),
 
   projectId: Joi.string().min(1).required(),
+
+  environment: Joi.string().valid('dev', 'prod').required(),
 });
 
 /**
@@ -74,12 +82,14 @@ export function buildConfig(cliArgs: ParsedCliArgs): Config {
   // Todas las variables son requeridas - no hay defaults
   const rawConfig = {
     outputFile: cliArgs['output'] || process.env['OPENAPI_OUTPUT_FILE'],
+    gatewayApiName: cliArgs['api-name'] || process.env['GATEWAY_API_NAME'],
     gatewayTitle: cliArgs['title'] || process.env['GATEWAY_TITLE'],
     gatewayDescription:
       cliArgs['description'] || process.env['GATEWAY_DESCRIPTION'],
     gatewayVersion: cliArgs['version'] || process.env['GATEWAY_VERSION'],
     protocol: cliArgs['protocol'] || process.env['BACKEND_PROTOCOL'],
     projectId: cliArgs['project-id'] || process.env['GOOGLE_CLOUD_PROJECT'],
+    environment: cliArgs['environment'] || process.env['ENVIRONMENT'],
   };
 
   // Validar configuración usando Joi

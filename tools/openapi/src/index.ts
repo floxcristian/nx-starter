@@ -85,7 +85,7 @@ async function main(): Promise<void> {
     const pathCount = Object.keys(enhancedSpec.paths || {}).length;
     const definitionCount = Object.keys(enhancedSpec.definitions || {}).length;
     logSpecificationStats(config.outputFile, pathCount, definitionCount);
-    logNextSteps(config.outputFile);
+    logNextSteps(config.outputFile, config.environment);
 
     console.log('🎉 ¡Proceso completado exitosamente!');
   } catch (error) {

@@ -85,6 +85,7 @@ npm run gateway:prod                # Producción
 - `USERS_BACKEND_URL`: URL del servicio de usuarios
 - `ORDERS_BACKEND_URL`: URL del servicio de órdenes
 - `GOOGLE_CLOUD_PROJECT`: ID del proyecto de Google Cloud para deployment y Firebase Auth
+- `GATEWAY_API_NAME`: Nombre de la API en Google Cloud API Gateway (ej: mi-api-gateway)
 - `OPENAPI_OUTPUT_FILE`: Archivo de salida personalizado
 - `GATEWAY_TITLE`: Título del gateway personalizado
 - `GATEWAY_DESCRIPTION`: Descripción del gateway personalizada
@@ -94,6 +95,7 @@ npm run gateway:prod                # Producción
 ### Argumentos CLI disponibles:
 
 - `--output <file>`: Archivo de salida
+- `--api-name <name>`: Nombre de la API en Google Cloud API Gateway
 - `--title <title>`: Título del gateway
 - `--description <desc>`: Descripción del gateway
 - `--version <version>`: Versión del gateway
@@ -145,6 +147,7 @@ npm run gateway:prod
 export USERS_BACKEND_URL=https://users-api.example.com
 export ORDERS_BACKEND_URL=https://orders-api.example.com
 export GOOGLE_CLOUD_PROJECT=mi-proyecto-id
+export GATEWAY_API_NAME=mi-empresa-api
 export GATEWAY_TITLE="Mi API Gateway"
 export BACKEND_PROTOCOL=https
 ```

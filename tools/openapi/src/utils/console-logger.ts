@@ -128,22 +128,23 @@ export function logSpecificationStats(
 }
 
 /**
- * Muestra los próximos pasos recomendados después de la generación
+ * Muestra los próximos pasos después de generar la especificación
  *
  * @param outputFile - Nombre del archivo generado
+ * @param environment - Entorno target ('dev' o 'prod')
  *
  * @example
  * ```typescript
- * logNextSteps('openapi-gateway-dev.yaml');
+ * logNextSteps('mi-empresa-api-dev.yaml', 'dev');
  * // 📚 Próximos pasos:
  * //    Desplegar: npm run gateway:deploy:dev
  * //    Gateway completo: npm run gateway:dev
  * ```
  */
-export function logNextSteps(outputFile: string): void {
-  const isDev = outputFile.includes('dev');
-  const environment = isDev ? 'dev' : 'prod';
-
+export function logNextSteps(
+  outputFile: string,
+  environment: 'dev' | 'prod'
+): void {
   console.log('\n📚 Próximos pasos:');
   console.log(`   Desplegar: npm run gateway:deploy:${environment}`);
   console.log(`   Gateway completo: npm run gateway:${environment}`);
