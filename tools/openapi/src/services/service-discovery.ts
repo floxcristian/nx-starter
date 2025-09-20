@@ -185,6 +185,16 @@ export function validateServiceUrls(
 }
 
 /**
+ * Versión simple de validación de URLs para compatibilidad
+ *
+ * @returns Record con las URLs validadas
+ */
+export function validateServiceUrlsSimple(): Record<string, string> {
+  const services = discoverServices();
+  return validateServiceUrls(services) as Record<string, string>;
+}
+
+/**
  * Muestra un resumen de los servicios descubiertos
  *
  * @param services - Array de configuraciones de servicios

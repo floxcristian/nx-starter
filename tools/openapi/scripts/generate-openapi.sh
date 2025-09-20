@@ -116,15 +116,14 @@ nx build users-domain orders-domain
 
 # Generar especificación
 echo "🚀 Ejecutando el generador..."
-node_modules/.bin/ts-node --project tools/openapi/tsconfig.json tools/openapi/scripts/generate-openapi.ts "$@"
 
 if [[ "$ENVIRONMENT" == "prod" ]]; then
-    ts-node tools/openapi/scripts/generate-openapi.ts \
+    node_modules/.bin/ts-node --project tools/openapi/tsconfig.json tools/openapi/src/index.ts \
         --output "openapi-gateway-prod.yaml" \
         --title "Monorepo API Gateway" \
         --protocol "https"
 else
-    ts-node tools/openapi/scripts/generate-openapi.ts \
+    node_modules/.bin/ts-node --project tools/openapi/tsconfig.json tools/openapi/src/index.ts \
         --output "openapi-gateway-dev.yaml" \
         --title "Monorepo API Gateway (Development)" \
         --protocol "http"

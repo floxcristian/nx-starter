@@ -8,21 +8,6 @@
 import * as Joi from 'joi';
 
 /**
- * Esquema de validación para variables de entorno básicas del sistema
- */
-export const environmentSchema = Joi.object({
-  // Variable requerida para identificación del proyecto en Google Cloud
-  GOOGLE_CLOUD_PROJECT: Joi.string().min(1).required(),
-
-  // Variables opcionales de configuración
-  OPENAPI_OUTPUT_FILE: Joi.string().optional(),
-  GATEWAY_TITLE: Joi.string().optional(),
-  GATEWAY_DESCRIPTION: Joi.string().optional(),
-  GATEWAY_VERSION: Joi.string().optional(),
-  BACKEND_PROTOCOL: Joi.string().valid('http', 'https').optional(),
-}).unknown(true); // Permitir otras variables de entorno
-
-/**
  * Esquema de validación para URLs de servicios individuales
  */
 export const serviceUrlSchema = Joi.string()
@@ -30,35 +15,37 @@ export const serviceUrlSchema = Joi.string()
   .required();
 
 /**
- * Valida las variables de entorno básicas del sistema
+ * Valida que las variables de entorno necesarias estén presentes
  *
- * @example
- * ```typescript
- * try {
- *   validateEnvironment();
- *   console.log('✅ Variables de entorno válidas');
- * } catch (error) {
- *   console.error('❌ Error:', error.message);
- * }
- * ```
- *
- * @throws {Error} Si las variables de entorno no son válidas
+ * @throws {Error} Si faltan variables requeridas
  */
 export function validateEnvironment(): void {
   console.log('🔍 Validando variables de entorno...');
 
-  const { error } = environmentSchema.validate(process.env);
+  const requiredVars = [
+    'GOOGLE_CLOUD_PROJECT',
+    'OPENAPI_OUTPUT_FILE',
+    'GATEWAY_TITLE',
+    'GATEWAY_DESCRIPTION',
+    'GATEWAY_VERSION',
+    'BACKEND_PROTOCOL',
+  ];
 
-  if (error) {
-    console.error('❌ Error en variables de entorno:');
-    error.details.forEach((detail: Joi.ValidationErrorItem) => {
-      console.error(`   - ${detail.message}`);
+  const missingVars = requiredVars.filter((varName) => !process.env[varName]);
+
+  if (missingVars.length > 0) {
+    console.error('❌ Faltan variables de entorno requeridas:');
+    missingVars.forEach((varName) => {
+      console.error(`   - ${varName}`);
     });
-
     console.error('\n💡 Variables requeridas:');
     console.error('   export GOOGLE_CLOUD_PROJECT=tu-proyecto-id');
-
-    throw new Error('Variables de entorno inválidas');
+    console.error('   export OPENAPI_OUTPUT_FILE=openapi-gateway.yaml');
+    console.error('   export GATEWAY_TITLE="Mi API Gateway"');
+    console.error('   export GATEWAY_DESCRIPTION="Descripción del gateway"');
+    console.error('   export GATEWAY_VERSION=1.0.0');
+    console.error('   export BACKEND_PROTOCOL=https');
+    process.exit(1);
   }
 }
 

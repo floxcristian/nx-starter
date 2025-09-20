@@ -13,11 +13,11 @@ import { ServiceModule, ServiceConfig } from '../types/index';
 const MODULE_PATHS = {
   /** Path del módulo principal de la aplicación */
   APP_MODULE: (serviceName: string) =>
-    `../../../apps/api-${serviceName}/src/app/app.module`,
+    `/root/projects/study/nx-starter/apps/api-${serviceName}/src/app/app.module`,
 
   /** Path del módulo de dominio como fallback */
   DOMAIN_MODULE: (serviceName: string) =>
-    `../../../libs/${serviceName}-domain/src/lib/${serviceName}-domain.module`,
+    `/root/projects/study/nx-starter/libs/${serviceName}-domain/src/lib/${serviceName}-domain.module`,
 } as const;
 
 /**
@@ -160,26 +160,5 @@ export async function loadAllModules(services: ServiceConfig[]): Promise<void> {
       console.error(`   ❌ Error cargando ${service.title}:`, error);
       throw error;
     }
-  }
-}
-
-/**
- * Verifica que todos los módulos de los servicios estén cargados
- *
- * @param services - Array de configuraciones de servicios
- * @throws {Error} Si algún servicio no tiene su módulo cargado
- *
- * @example
- * ```typescript
- * await loadAllModules(services);
- * validateModulesLoaded(services); // No arroja error si todo está bien
- * ```
- */
-export function validateModulesLoaded(services: ServiceConfig[]): void {
-  const unloadedServices = services.filter((service) => !service.module);
-
-  if (unloadedServices.length > 0) {
-    const serviceNames = unloadedServices.map((s) => s.title).join(', ');
-    throw new Error(`Servicios sin módulos cargados: ${serviceNames}`);
   }
 }
