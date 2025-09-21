@@ -93,17 +93,18 @@ npm run gateway:prod                # Producción
 - `BACKEND_PROTOCOL`: Protocolo de backend (http/https)
 - `RATE_LIMIT_PER_MINUTE`: Límite de requests por minuto (default: 10000, rango: 1-1000000)
 
-### Argumentos CLI disponibles:
+### Archivos de configuración:
 
-- `--output <file>`: Archivo de salida
-- `--api-name <name>`: Nombre de la API en Google Cloud API Gateway
-- `--title <title>`: Título del gateway
-- `--description <desc>`: Descripción del gateway
-- `--version <version>`: Versión del gateway
-- `--protocol <protocol>`: Protocolo de backend
-- `--project-id <id>`: ID del proyecto de Google Cloud
-- `--rate-limit <number>`: Límite de requests por minuto (1-1000000)
-- `--help`: Mostrar ayuda
+Utiliza archivos `.env.{environment}` en la raíz del workspace:
+
+```bash
+# .env.dev
+ENVIRONMENT=dev
+USERS_BACKEND_URL=https://api-users-dev.example.com
+ORDERS_BACKEND_URL=https://api-orders-dev.example.com
+GATEWAY_API_NAME=mi-api-dev
+# ... resto de variables
+```
 
 ## Auto-Discovery de Servicios
 

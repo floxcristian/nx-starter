@@ -122,14 +122,6 @@ export interface Config {
 }
 
 /**
- * Argumentos de línea de comandos parseados
- */
-export interface ParsedCliArgs {
-  /** Argumentos con sus valores */
-  [key: string]: string | boolean;
-}
-
-/**
  * Variables de entorno validadas para URLs de servicios
  */
 export interface ValidatedServiceUrls {

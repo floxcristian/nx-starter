@@ -5,7 +5,7 @@
  * la arquitectura modular organizada.
  */
 
-import { buildConfig, parseCliArguments } from './validators/config-validator';
+import { buildConfig } from './validators/config-validator';
 import {
   discoverServices,
   validateServiceUrls,
@@ -31,8 +31,7 @@ async function main(): Promise<void> {
   try {
     // 1. Obtener configuración (incluye validación completa)
     console.log('🔧 Iniciando generador OpenAPI...');
-    const cliArgs = parseCliArguments(process.argv);
-    const config = buildConfig(cliArgs);
+    const config = buildConfig();
 
     // 2. Descubrir servicios disponibles
     const services = discoverServices();
@@ -58,7 +57,7 @@ async function main(): Promise<void> {
     const combinedDocument = combineOpenAPIDocuments(
       documents,
       config.gatewayTitle,
-      `API Gateway unificada`,
+      config.gatewayDescription,
       config.gatewayVersion
     );
 
@@ -96,5 +95,3 @@ if (require.main === module) {
     process.exit(1);
   });
 }
-
-export { main };
