@@ -11,7 +11,7 @@ import { Config, ParsedCliArgs } from '../types/index';
 /**
  * Esquema de validación para la configuración principal del generador
  */
-export const configSchema = Joi.object({
+const configSchema = Joi.object({
   outputFile: Joi.string().min(1).required(),
 
   gatewayApiName: Joi.string()
@@ -33,6 +33,8 @@ export const configSchema = Joi.object({
   projectId: Joi.string().min(1).required(),
 
   environment: Joi.string().valid('dev', 'prod').required(),
+
+  rateLimitPerMinute: Joi.number().min(1).max(1000000).default(10000),
 });
 
 /**
@@ -71,11 +73,14 @@ export function parseCliArguments(argv: string[]): ParsedCliArgs {
  * const args = parseCliArguments(process.argv);
  * const config = buildConfig(args);
  * console.log(`Generando ${config.gatewayTitle} v${config.gatewayVersion}`);
+ * console.log(`Rate limit: ${config.rateLimitPerMinute} requests/min`);
  * ```
  *
  * @throws {Error} Si la configuración no es válida
  */
 export function buildConfig(cliArgs: ParsedCliArgs): Config {
+  console.log('🔍 Validando variables de entorno...');
+
   // Combinar fuentes de configuración con precedencia:
   // 1. Argumentos CLI (prioridad más alta)
   // 2. Variables de entorno
@@ -88,19 +93,37 @@ export function buildConfig(cliArgs: ParsedCliArgs): Config {
       cliArgs['description'] || process.env['GATEWAY_DESCRIPTION'],
     gatewayVersion: cliArgs['version'] || process.env['GATEWAY_VERSION'],
     protocol: cliArgs['protocol'] || process.env['BACKEND_PROTOCOL'],
-    projectId: cliArgs['project-id'] || process.env['GOOGLE_CLOUD_PROJECT'],
+    projectId: cliArgs['project-id'] || process.env['GCLOUD_PROJECT_ID'],
     environment: cliArgs['environment'] || process.env['ENVIRONMENT'],
+    rateLimitPerMinute: parseInt(
+      (typeof cliArgs['rate-limit'] === 'string'
+        ? cliArgs['rate-limit']
+        : null) ||
+        process.env['RATE_LIMIT_PER_MINUTE'] ||
+        '10000'
+    ),
   };
 
   // Validar configuración usando Joi
   const { error, value } = configSchema.validate(rawConfig);
 
   if (error) {
-    console.error('❌ Error en configuración:');
+    console.error(
+      '❌ Faltan variables de entorno requeridas o valores inválidos:'
+    );
     error.details.forEach((detail: Joi.ValidationErrorItem) => {
       console.error(`   - ${detail.message}`);
     });
-    console.error('\n💡 Verifica tus variables de entorno o argumentos CLI');
+    console.error('\n💡 Variables requeridas:');
+    console.error('   export GCLOUD_PROJECT_ID=tu-proyecto-id');
+    console.error('   export GATEWAY_API_NAME=mi-api-gateway');
+    console.error('   export OPENAPI_OUTPUT_FILE=openapi-gateway.yaml');
+    console.error('   export GATEWAY_TITLE="Mi API Gateway"');
+    console.error('   export GATEWAY_DESCRIPTION="Descripción del gateway"');
+    console.error('   export GATEWAY_VERSION=1.0.0');
+    console.error('   export BACKEND_PROTOCOL=https');
+    console.error('   export ENVIRONMENT=dev');
+    console.error('   export RATE_LIMIT_PER_MINUTE=10000');
     process.exit(1);
   }
 

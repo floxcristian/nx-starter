@@ -5,11 +5,10 @@
  * la arquitectura modular organizada.
  */
 
-import { validateEnvironment } from './validators/environment-validator';
 import { buildConfig, parseCliArguments } from './validators/config-validator';
 import {
   discoverServices,
-  validateServiceUrlsSimple,
+  validateServiceUrls,
 } from './services/service-discovery';
 import { loadAllModules } from './services/module-loader';
 import {
@@ -30,20 +29,16 @@ import {
  */
 async function main(): Promise<void> {
   try {
-    console.log('🔍 Auto-descubriendo servicios API...');
-
-    // 1. Validar entorno
-    validateEnvironment();
+    // 1. Obtener configuración (incluye validación completa)
+    console.log('🔧 Iniciando generador OpenAPI...');
+    const cliArgs = parseCliArguments(process.argv);
+    const config = buildConfig(cliArgs);
 
     // 2. Descubrir servicios disponibles
     const services = discoverServices();
 
-    // 3. Obtener configuración
-    const cliArgs = parseCliArguments(process.argv);
-    const config = buildConfig(cliArgs);
-
-    // 4. Validar URLs de servicios
-    const serviceUrls = validateServiceUrlsSimple();
+    // 3. Validar URLs de servicios
+    const serviceUrls = validateServiceUrls(services) as Record<string, string>;
 
     // Mostrar configuración
     logConfiguration(config);

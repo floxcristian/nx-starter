@@ -5,7 +5,7 @@
  * para la extracción de configuración Swagger/OpenAPI.
  */
 
-import { ServiceModule, ServiceConfig } from '../types/index';
+import { ServiceModule, ServiceConfig, StringUtils } from '../types/index';
 
 /**
  * Posibles ubicaciones donde buscar módulos de aplicación
@@ -91,7 +91,7 @@ function findModuleClass(
   // Lista de nombres posibles para el módulo, en orden de prioridad
   const possibleNames = [
     'AppModule',
-    `${serviceName.charAt(0).toUpperCase() + serviceName.slice(1)}DomainModule`,
+    `${StringUtils.capitalize(serviceName)}DomainModule`,
     'default',
   ];
 

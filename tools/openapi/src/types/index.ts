@@ -117,6 +117,8 @@ export interface Config {
   projectId: string;
   /** Entorno target para deployment */
   environment: 'dev' | 'prod';
+  /** Límite de requests por minuto en Google Cloud */
+  rateLimitPerMinute: number;
 }
 
 /**
@@ -151,15 +153,24 @@ export const CONSTANTS = {
     'trace',
   ] as const,
 
-  /** Extensiones de archivo soportadas */
-  FILE_EXTENSIONS: {
-    YAML: '.yaml',
-    YML: '.yml',
-    JSON: '.json',
+  /** Configuración de Google Cloud API Gateway */
+  GOOGLE_CLOUD: {
+    /** Protocolo HTTP/1.1 para Google Cloud */
+    PROTOCOL_HTTP: 'http/1.1',
+    /** Protocolo HTTP/2 para Google Cloud */
+    PROTOCOL_H2: 'h2',
   } as const,
 } as const;
 
 /**
- * Tipo que representa los métodos HTTP válidos
+ * Utilidades para manipulación de strings
  */
-export type HttpMethod = (typeof CONSTANTS.HTTP_METHODS)[number];
+export const StringUtils = {
+  /**
+   * Capitaliza la primera letra de una cadena
+   * @param str - Cadena a capitalizar
+   * @returns Cadena con la primera letra en mayúscula
+   */
+  capitalize: (str: string): string =>
+    str.charAt(0).toUpperCase() + str.slice(1),
+} as const;

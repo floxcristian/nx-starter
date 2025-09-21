@@ -9,8 +9,7 @@ tools/openapi/src/
 ├── index.ts                    # Orquestador principal
 ├── types/index.ts             # Interfaces TypeScript centralizadas
 ├── validators/
-│   ├── environment-validator.ts # Validación de variables de entorno
-│   └── config-validator.ts     # Configuración del gateway
+│   └── config-validator.ts     # Validación y configuración del gateway
 ├── services/
 │   ├── service-discovery.ts    # Auto-discovery de APIs
 │   ├── module-loader.ts        # Carga dinámica de módulos NestJS
@@ -18,7 +17,8 @@ tools/openapi/src/
 │   └── google-cloud-enhancer.ts # Optimización para Google Cloud
 └── utils/
     ├── file-utils.ts          # Escritura de archivos
-    └── console-logger.ts      # Logging estructurado
+    ├── console-logger.ts      # Logging estructurado
+    └── url-utils.ts           # Validación y manejo de URLs
 ```
 
 **Funcionalidades:**
@@ -84,13 +84,14 @@ npm run gateway:prod                # Producción
 
 - `USERS_BACKEND_URL`: URL del servicio de usuarios
 - `ORDERS_BACKEND_URL`: URL del servicio de órdenes
-- `GOOGLE_CLOUD_PROJECT`: ID del proyecto de Google Cloud para deployment y Firebase Auth
+- `GCLOUD_PROJECT_ID`: ID del proyecto de Google Cloud para deployment
 - `GATEWAY_API_NAME`: Nombre de la API en Google Cloud API Gateway (ej: mi-api-gateway)
 - `OPENAPI_OUTPUT_FILE`: Archivo de salida personalizado
 - `GATEWAY_TITLE`: Título del gateway personalizado
 - `GATEWAY_DESCRIPTION`: Descripción del gateway personalizada
 - `GATEWAY_VERSION`: Versión del gateway personalizada
 - `BACKEND_PROTOCOL`: Protocolo de backend (http/https)
+- `RATE_LIMIT_PER_MINUTE`: Límite de requests por minuto (default: 10000, rango: 1-1000000)
 
 ### Argumentos CLI disponibles:
 
@@ -101,6 +102,7 @@ npm run gateway:prod                # Producción
 - `--version <version>`: Versión del gateway
 - `--protocol <protocol>`: Protocolo de backend
 - `--project-id <id>`: ID del proyecto de Google Cloud
+- `--rate-limit <number>`: Límite de requests por minuto (1-1000000)
 - `--help`: Mostrar ayuda
 
 ## Auto-Discovery de Servicios
@@ -146,7 +148,7 @@ npm run gateway:prod
 ```bash
 export USERS_BACKEND_URL=https://users-api.example.com
 export ORDERS_BACKEND_URL=https://orders-api.example.com
-export GOOGLE_CLOUD_PROJECT=mi-proyecto-id
+export GCLOUD_PROJECT_ID=mi-proyecto-id
 export GATEWAY_API_NAME=mi-empresa-api
 export GATEWAY_TITLE="Mi API Gateway"
 export BACKEND_PROTOCOL=https

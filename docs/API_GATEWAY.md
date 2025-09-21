@@ -182,6 +182,8 @@ bash tools/scripts/create-gateway.sh dev
 
 ### **Variables Requeridas**
 
+Todas las siguientes variables son **obligatorias** y deben estar definidas:
+
 ```bash
 # URLs de tus APIs (patrón: *_BACKEND_URL)
 USERS_BACKEND_URL=https://api-users-xxx.run.app/api
@@ -191,45 +193,36 @@ ORDERS_BACKEND_URL=https://api-orders-xxx.run.app/api
 GATEWAY_API_NAME=mi-empresa-api           # Nombre del API en Google Cloud
 BACKEND_PROTOCOL=https                    # http para dev, https para prod
 GATEWAY_TITLE="Mi API Gateway"
+GATEWAY_DESCRIPTION="Descripción del gateway"
 GATEWAY_VERSION=1.0.0
 OPENAPI_OUTPUT_FILE=openapi-gateway.yaml
+ENVIRONMENT=dev                           # dev o prod
 
-# Configuración de Google Cloud (REQUERIDO)
-GOOGLE_CLOUD_PROJECT=mi-proyecto-123      # SIEMPRE requerido para deployment
-```
-
-### **Variables Opcionales**
-
-```bash
-# Configuración adicional del gateway (tienen valores por defecto)
-GATEWAY_DESCRIPTION="Descripción personalizada del gateway"
+# Configuración de Google Cloud
+GCLOUD_PROJECT_ID=mi-proyecto-123         # ID del proyecto en Google Cloud
 ```
 
 ### **⚠️ Detalles de las variables de Google Cloud**
 
-#### **`GOOGLE_CLOUD_PROJECT` (OBLIGATORIO)**
+#### **`GCLOUD_PROJECT_ID` (OBLIGATORIO)**
 
-- ✅ **Para qué**: Configurar Firebase Auth y deployment en Google Cloud API Gateway
+- ✅ **Para qué**: Deployment en Google Cloud API Gateway
 - ❌ **Sin él**: El script falla inmediatamente con error claro
 - 🎯 **Uso**: SIEMPRE requerido, no funciona sin él
 - 🔒 **Validación**: Se valida al inicio del script
 
-### **🔐 Métodos de autenticación disponibles:**
+### **🔐 Método de autenticación:**
 
 ```bash
-✅ api_key (query parameter) - Para APIs públicas con clave
-✅ x_api_key (header) - Para APIs con clave en header
-✅ firebase_auth (Firebase) - Para autenticación de usuarios
+✅ x-api-key (header) - API Key en header (estándar de Google Cloud)
 ```
 
-### **💡 Uso típico con API Keys:**
+### **💡 Uso con API Key:**
 
 ```bash
-# Usando query parameter
-curl "https://gateway.com/users?key=TU_API_KEY"
-
-# Usando header (recomendado)
+# API Key en header (método seguro recomendado por Google)
 curl -H "x-api-key: TU_API_KEY" https://gateway.com/users
+curl -H "x-api-key: TU_API_KEY" https://gateway.com/orders
 ```
 
 ### **Auto-discovery de Servicios**

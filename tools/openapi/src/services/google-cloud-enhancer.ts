@@ -49,7 +49,7 @@ export function enhanceSpecificationForGoogleCloud(
 
   // Añadir configuraciones de Google Cloud
   addGoogleCloudManagement(enhancedSpec, config);
-  addSecuritySchemes(enhancedSpec, config);
+  addSecuritySchemes(enhancedSpec);
   addBackendConfiguration(enhancedSpec, serviceUrls, config, services);
 
   return enhancedSpec;
@@ -88,14 +88,16 @@ function addGoogleCloudManagement(
             name: 'RequestsPerMinutePerProject',
             metric: 'request_count',
             unit: '1/min/{project}',
-            values: { STANDARD: 10000 },
+            values: { STANDARD: config.rateLimitPerMinute },
           },
         ],
       },
     },
     'x-google-endpoints': [
       {
-        name: generateEndpointName(config.gatewayTitle),
+        name: `${config.gatewayTitle
+          .toLowerCase()
+          .replace(/\s+/g, '-')}-gateway`,
         allowCors: true,
       },
     ],
@@ -103,58 +105,29 @@ function addGoogleCloudManagement(
 }
 
 /**
- * Genera un nombre de endpoint válido para Google Cloud
- *
- * @param title - Título del gateway
- * @returns Nombre de endpoint normalizado
- */
-function generateEndpointName(title: string): string {
-  return `${title.toLowerCase().replace(/\s+/g, '-')}-gateway`;
-}
-
-/**
  * Añade esquemas de seguridad compatibles con Google Cloud
  *
  * @param spec - Especificación a modificar
- * @param config - Configuración del gateway
  */
-function addSecuritySchemes(spec: SwaggerV2Document, config: Config): void {
+function addSecuritySchemes(spec: SwaggerV2Document): void {
   // Inicializar securityDefinitions si no existe
   if (!spec.securityDefinitions) {
     spec.securityDefinitions = {};
   }
 
   const securitySchemes: Record<string, SecurityDefinition> = {
-    // API Key en query parameter (formato estándar de Google Cloud)
-    api_key: {
-      type: 'apiKey',
-      name: 'key',
-      in: 'query',
-    },
-
-    // API Key en header alternativo
+    // API Key en header (formato recomendado por Google Cloud)
     x_api_key: {
       type: 'apiKey',
       name: 'x-api-key',
       in: 'header',
     },
-
-    // Firebase Authentication (OAuth2)
-    firebase_auth: {
-      type: 'oauth2',
-      authorizationUrl: `https://securetoken.google.com/${config.projectId}`,
-      flow: 'implicit',
-      'x-google-issuer': `https://securetoken.google.com/${config.projectId}`,
-      'x-google-jwks_uri':
-        'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com',
-      'x-google-audiences': config.projectId,
-    },
   };
 
   Object.assign(spec.securityDefinitions, securitySchemes);
 
-  // Configurar seguridad global (API key requerida por defecto)
-  spec.security = [{ api_key: [] }, { x_api_key: [] }];
+  // Configurar seguridad global (API key en header requerida por defecto)
+  spec.security = [{ x_api_key: [] }];
 }
 
 /**
@@ -194,12 +167,14 @@ function addBackendConfiguration(
           Object.assign(operation, {
             'x-google-backend': {
               address: serviceUrls[service.urlEnvVar],
-              protocol: config.protocol === 'https' ? 'h2' : 'http/1.1',
+              protocol:
+                config.protocol === 'https'
+                  ? CONSTANTS.GOOGLE_CLOUD.PROTOCOL_H2
+                  : CONSTANTS.GOOGLE_CLOUD.PROTOCOL_HTTP,
               path_translation: 'APPEND_PATH_TO_ADDRESS',
             },
             // Asegurar que cada operación tenga seguridad
             security: (operation as { security?: unknown }).security || [
-              { api_key: [] },
               { x_api_key: [] },
             ],
           });

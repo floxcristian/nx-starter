@@ -1,8 +1,8 @@
 /**
- * @fileoverview Validador de variables de entorno
+ * @fileoverview Utilidades para validación y manejo de URLs
  *
- * Contiene esquemas y funciones de validación para las variables de entorno
- * requeridas por el generador de OpenAPI. Utiliza Joi para validación robusta.
+ * Contiene funciones reutilizables para validar URLs de servicios
+ * y generar ejemplos de ayuda para el usuario.
  */
 
 import * as Joi from 'joi';
@@ -13,45 +13,6 @@ import * as Joi from 'joi';
 export const serviceUrlSchema = Joi.string()
   .uri({ scheme: ['http', 'https'] })
   .required();
-
-/**
- * Valida que las variables de entorno necesarias estén presentes
- *
- * @throws {Error} Si faltan variables requeridas
- */
-export function validateEnvironment(): void {
-  console.log('🔍 Validando variables de entorno...');
-
-  const requiredVars = [
-    'GOOGLE_CLOUD_PROJECT',
-    'GATEWAY_API_NAME',
-    'OPENAPI_OUTPUT_FILE',
-    'GATEWAY_TITLE',
-    'GATEWAY_DESCRIPTION',
-    'GATEWAY_VERSION',
-    'BACKEND_PROTOCOL',
-    'ENVIRONMENT',
-  ];
-
-  const missingVars = requiredVars.filter((varName) => !process.env[varName]);
-
-  if (missingVars.length > 0) {
-    console.error('❌ Faltan variables de entorno requeridas:');
-    missingVars.forEach((varName) => {
-      console.error(`   - ${varName}`);
-    });
-    console.error('\n💡 Variables requeridas:');
-    console.error('   export GOOGLE_CLOUD_PROJECT=tu-proyecto-id');
-    console.error('   export GATEWAY_API_NAME=mi-api-gateway');
-    console.error('   export OPENAPI_OUTPUT_FILE=openapi-gateway.yaml');
-    console.error('   export GATEWAY_TITLE="Mi API Gateway"');
-    console.error('   export GATEWAY_DESCRIPTION="Descripción del gateway"');
-    console.error('   export GATEWAY_VERSION=1.0.0');
-    console.error('   export BACKEND_PROTOCOL=https');
-    console.error('   export ENVIRONMENT=dev');
-    process.exit(1);
-  }
-}
 
 /**
  * Valida una URL individual de servicio

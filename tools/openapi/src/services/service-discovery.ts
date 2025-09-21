@@ -6,11 +6,12 @@
  */
 
 import * as fs from 'fs';
-import { ServiceConfig, ValidatedServiceUrls } from '../types/index';
 import {
-  validateServiceUrl,
-  showUrlExamples,
-} from '../validators/environment-validator';
+  ServiceConfig,
+  ValidatedServiceUrls,
+  StringUtils,
+} from '../types/index';
+import { validateServiceUrl, showUrlExamples } from '../utils/url-utils';
 
 /**
  * Descubre automáticamente los servicios API disponibles en el workspace
@@ -45,12 +46,10 @@ export function discoverServices(): ServiceConfig[] {
 
     if (match && envVars[envKey]) {
       const serviceName = match[1].toLowerCase();
-      const serviceUrl = envVars[envKey];
 
-      // Verificar que existe la aplicación correspondiente
       if (isServiceAppAvailable(serviceName)) {
         services.push(createServiceConfig(serviceName, envKey));
-        console.log(`   ✅ ${serviceName}: ${serviceUrl}`);
+        console.log(`   ✅ ${serviceName}: ${envVars[envKey]}`);
       } else {
         console.log(
           `   ⚠️  ${serviceName}: App no encontrada en apps/api-${serviceName}`
@@ -124,9 +123,9 @@ function createServiceConfig(
   return {
     name: serviceName,
     module: null, // Se carga dinámicamente más tarde
-    urlEnvVar: urlEnvVar,
+    urlEnvVar,
     pathPrefix: `/${serviceName}`,
-    title: `${serviceName.charAt(0).toUpperCase() + serviceName.slice(1)} API`,
+    title: `${StringUtils.capitalize(serviceName)} API`,
   };
 }
 
@@ -182,40 +181,4 @@ export function validateServiceUrls(
   }
 
   return envVars;
-}
-
-/**
- * Versión simple de validación de URLs para compatibilidad
- *
- * @returns Record con las URLs validadas
- */
-export function validateServiceUrlsSimple(): Record<string, string> {
-  const services = discoverServices();
-  return validateServiceUrls(services) as Record<string, string>;
-}
-
-/**
- * Muestra un resumen de los servicios descubiertos
- *
- * @param services - Array de configuraciones de servicios
- * @param serviceUrls - URLs validadas de los servicios
- *
- * @example
- * ```typescript
- * const services = discoverServices();
- * const urls = validateServiceUrls(services);
- * logServicesSummary(services, urls);
- * // 📡 URLs de servicios:
- * //    - Users API: https://api.example.com/users
- * //    - Orders API: https://api.example.com/orders
- * ```
- */
-export function logServicesSummary(
-  services: ServiceConfig[],
-  serviceUrls: ValidatedServiceUrls
-): void {
-  console.log('📡 URLs de servicios:');
-  services.forEach((service) => {
-    console.log(`   - ${service.title}: ${serviceUrls[service.urlEnvVar]}`);
-  });
 }
