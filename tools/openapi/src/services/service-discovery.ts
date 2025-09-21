@@ -43,8 +43,8 @@ export function discoverServices(): ServiceConfig[] {
 
   Object.keys(envVars).forEach((envKey) => {
     const match = envKey.match(backendUrlPattern);
-    // TODO: que pasa si es PRODUCT_DETAILS_BACKEND_URL ?
 
+    // TODO: que pasa si es PRODUCT_DETAILS_BACKEND_URL ?
     if (match && envVars[envKey]) {
       const serviceName = match[1].toLowerCase();
 
@@ -52,25 +52,15 @@ export function discoverServices(): ServiceConfig[] {
         services.push(createServiceConfig(serviceName, envKey));
         console.log(`   ✅ ${serviceName}: ${envVars[envKey]}`);
       } else {
-        console.log(
-          `   ⚠️  ${serviceName}: App no encontrada en apps/api-${serviceName}`
+        throw new Error(
+          `Servicio '${serviceName}' configurado en ${envKey} pero app 'apps/api-${serviceName}' no existe`
         );
       }
     }
   });
 
-  // TODO: yo creo que este mensaje sobra.
   if (services.length === 0) {
-    console.error('❌ No se encontraron servicios API configurados.');
-    console.error('💡 Para que el auto-discovery funcione, necesitas:');
-    console.error(
-      '   1. Apps que empiecen con "api-" en apps/ (ej: apps/api-users)'
-    );
-    console.error(
-      '   2. Variables de entorno *_BACKEND_URL (ej: USERS_BACKEND_URL)'
-    );
-    console.error('   3. Módulo app.module.ts en src/app/ de cada API');
-    throw new Error('No se encontraron servicios API');
+    throw new Error('No se encontraron servicios API configurados');
   }
 
   return services;
@@ -89,19 +79,7 @@ export function discoverServices(): ServiceConfig[] {
  * ```
  */
 function isServiceAppAvailable(serviceName: string): boolean {
-  const appPath = `apps/api-${serviceName}`;
-  const appModulePath = `${appPath}/src/app/app.module.ts`;
-
-  try {
-    return fs.existsSync(appModulePath);
-  } catch (error) {
-    console.log(
-      `   ❌ ${serviceName}: Error verificando app - ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-    return false;
-  }
+  return fs.existsSync(`apps/api-${serviceName}/src/app/app.module.ts`);
 }
 
 /**
