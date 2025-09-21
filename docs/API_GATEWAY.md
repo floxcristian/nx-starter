@@ -199,12 +199,12 @@ OPENAPI_OUTPUT_FILE=openapi-gateway.yaml
 ENVIRONMENT=dev                           # dev o prod
 
 # Configuración de Google Cloud
-GCLOUD_PROJECT_ID=mi-proyecto-123         # ID del proyecto en Google Cloud
+GCP_PROJECT_ID=mi-proyecto-123         # ID del proyecto en Google Cloud
 ```
 
 ### **⚠️ Detalles de las variables de Google Cloud**
 
-#### **`GCLOUD_PROJECT_ID` (OBLIGATORIO)**
+#### **`GCP_PROJECT_ID` (OBLIGATORIO)**
 
 - ✅ **Para qué**: Deployment en Google Cloud API Gateway
 - ❌ **Sin él**: El script falla inmediatamente con error claro

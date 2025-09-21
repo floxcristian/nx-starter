@@ -84,7 +84,7 @@ npm run gateway:prod                # Producción
 
 - `USERS_BACKEND_URL`: URL del servicio de usuarios
 - `ORDERS_BACKEND_URL`: URL del servicio de órdenes
-- `GCLOUD_PROJECT_ID`: ID del proyecto de Google Cloud para deployment
+- `GCP_PROJECT_ID`: ID del proyecto de Google Cloud para deployment
 - `GATEWAY_API_NAME`: Nombre de la API en Google Cloud API Gateway (ej: mi-api-gateway)
 - `OPENAPI_OUTPUT_FILE`: Archivo de salida personalizado
 - `GATEWAY_TITLE`: Título del gateway personalizado
@@ -149,7 +149,7 @@ npm run gateway:prod
 ```bash
 export USERS_BACKEND_URL=https://users-api.example.com
 export ORDERS_BACKEND_URL=https://orders-api.example.com
-export GCLOUD_PROJECT_ID=mi-proyecto-id
+export GCP_PROJECT_ID=mi-proyecto-id
 export GATEWAY_API_NAME=mi-empresa-api
 export GATEWAY_TITLE="Mi API Gateway"
 export BACKEND_PROTOCOL=https

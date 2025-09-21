@@ -43,6 +43,7 @@ export function discoverServices(): ServiceConfig[] {
 
   Object.keys(envVars).forEach((envKey) => {
     const match = envKey.match(backendUrlPattern);
+    // TODO: que pasa si es PRODUCT_DETAILS_BACKEND_URL ?
 
     if (match && envVars[envKey]) {
       const serviceName = match[1].toLowerCase();
@@ -58,6 +59,7 @@ export function discoverServices(): ServiceConfig[] {
     }
   });
 
+  // TODO: yo creo que este mensaje sobra.
   if (services.length === 0) {
     console.error('❌ No se encontraron servicios API configurados.');
     console.error('💡 Para que el auto-discovery funcione, necesitas:');

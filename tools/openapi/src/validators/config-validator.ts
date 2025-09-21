@@ -58,7 +58,7 @@ export function buildConfig(): Config {
     gatewayDescription: process.env['GATEWAY_DESCRIPTION'],
     gatewayVersion: process.env['GATEWAY_VERSION'],
     protocol: process.env['BACKEND_PROTOCOL'],
-    projectId: process.env['GCLOUD_PROJECT_ID'],
+    projectId: process.env['GCP_PROJECT_ID'],
     environment: process.env['ENVIRONMENT'],
     rateLimitPerMinute: parseInt(
       process.env['RATE_LIMIT_PER_MINUTE'] || '10000'

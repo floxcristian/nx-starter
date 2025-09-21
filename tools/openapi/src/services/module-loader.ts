@@ -10,6 +10,9 @@ import { ServiceModule, ServiceConfig, StringUtils } from '../types/index';
 /**
  * Posibles ubicaciones donde buscar módulos de aplicación
  */
+// TODO: estas constantes estan mal, el nombre del repositorio (nx-starter) podría cambiar,
+// y las rutas son de un ordenador específico cuando cualquiera debería poder ejecutar esto.
+//
 const MODULE_PATHS = {
   /** Path del módulo principal de la aplicación */
   APP_MODULE: (serviceName: string) =>
@@ -42,6 +45,7 @@ const MODULE_PATHS = {
  *
  * @throws {Error} Si no se puede cargar el módulo desde ninguna ubicación
  */
+// TODO: un api puede tener diferentes librerías y no necesariamente un dominio
 export async function loadAppModule(
   serviceName: string
 ): Promise<ServiceModule> {
