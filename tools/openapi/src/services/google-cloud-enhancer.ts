@@ -10,7 +10,6 @@ import {
   SecurityDefinition,
   Config,
   ServiceConfig,
-  ValidatedServiceUrls,
   CONSTANTS,
 } from '../types/index';
 
@@ -39,13 +38,21 @@ import {
  */
 export function enhanceSpecificationForGoogleCloud(
   spec: SwaggerV2Document,
-  serviceUrls: ValidatedServiceUrls,
   config: Config,
   services: ServiceConfig[]
 ): SwaggerV2Document {
   console.log('☁️ Añadiendo configuración de Google Cloud API Gateway...');
 
   const enhancedSpec = { ...spec };
+
+  // Construir URLs de servicios desde ServiceConfig
+  const serviceUrls: Record<string, string> = {};
+  for (const service of services) {
+    const url = process.env[service.urlEnvVar];
+    if (url) {
+      serviceUrls[service.urlEnvVar] = url;
+    }
+  }
 
   // Añadir configuraciones de Google Cloud
   addGoogleCloudManagement(enhancedSpec, config);
@@ -140,7 +147,7 @@ function addSecuritySchemes(spec: SwaggerV2Document): void {
  */
 function addBackendConfiguration(
   spec: SwaggerV2Document,
-  serviceUrls: ValidatedServiceUrls,
+  serviceUrls: Record<string, string>,
   config: Config,
   services: ServiceConfig[]
 ): void {

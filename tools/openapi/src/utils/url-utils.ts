@@ -38,27 +38,3 @@ export function validateServiceUrl(envVar: string, url: string): string {
 
   return url;
 }
-
-/**
- * Muestra ejemplos de URLs válidas para ayudar al usuario
- *
- * @param serviceNames - Lista de nombres de servicios para generar ejemplos
- *
- * @example
- * ```typescript
- * showUrlExamples(['users', 'orders']);
- * // Imprime:
- * // 💡 Ejemplo de URLs válidas:
- * //    export USERS_BACKEND_URL=https://api-users-xxx.run.app/api
- * //    export ORDERS_BACKEND_URL=https://api-orders-xxx.run.app/api
- * ```
- */
-export function showUrlExamples(serviceNames: string[]): void {
-  console.error('\n💡 Ejemplo de URLs válidas:');
-  serviceNames.forEach((serviceName) => {
-    const envVar = `${serviceName.toUpperCase()}_BACKEND_URL`;
-    console.error(
-      `   export ${envVar}=https://api-${serviceName}-xxx.run.app/api`
-    );
-  });
-}

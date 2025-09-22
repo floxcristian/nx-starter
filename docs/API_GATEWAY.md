@@ -28,11 +28,13 @@ graph LR
 
 ### **Flujo de trabajo:**
 
-1. **📊 Extracción**: Lee la configuración real de Swagger de tus APIs NestJS
-2. **🔄 Conversión**: Convierte OpenAPI 3.0 → Swagger 2.0 (requerido por Google Cloud)
-3. **☁️ Optimización**: Añade configuraciones específicas de Google Cloud
-4. **🚀 Deploy**: Crea configuración en Google Cloud API Gateway
-5. **🌐 Gateway**: Crea puerta de enlace pública con URL accesible
+1. **📊 Análisis Estático**: Analiza archivos de controladores TypeScript sin cargar módulos dinámicamente
+2. **🔍 Auto-Discovery**: Utiliza la configuración del workspace Nx para descubrir servicios automáticamente
+3. **📝 Extracción**: Extrae rutas, parámetros y documentación Swagger de los controladores
+4. **🔄 Conversión**: Convierte OpenAPI 3.0 → Swagger 2.0 (requerido por Google Cloud)
+5. **☁️ Optimización**: Añade configuraciones específicas de Google Cloud
+6. **🚀 Deploy**: Crea configuración en Google Cloud API Gateway
+7. **🌐 Gateway**: Crea puerta de enlace pública con URL accesible
 
 ---
 
@@ -132,20 +134,20 @@ npm run gateway:prod
 
 ### **1. Generador OpenAPI (`generate-openapi.ts`)**
 
-**Ubicación:** `tools/openapi/scripts/generate-openapi.ts`
+**Ubicación:** `tools/scripts/generate-openapi.ts`
 
 **Funcionalidades:**
 
-- 🔍 **Auto-discovery**: Detecta APIs automáticamente vía variables `*_BACKEND_URL`
-- 📦 **Carga dinámica**: Importa módulos NestJS en runtime
-- 🏗️ **Extracción real**: Genera specs desde código real (no mock)
+- 🔍 **Auto-discovery**: Detecta proyectos automáticamente usando configuración del workspace Nx
+- � **Análisis estático**: Analiza archivos de controladores TypeScript usando AST
+- 🏗️ **Extracción real**: Genera specs desde código real sin carga dinámica de módulos
 - 🔄 **Conversión**: OpenAPI 3.0 → Swagger 2.0 con `api-spec-converter`
 - ☁️ **Optimización GCP**: Añade configuraciones específicas de Google Cloud
 
 **Ejemplo de ejecución:**
 
 ```bash
-node tools/openapi/scripts/generate-openapi.ts --output ${OPENAPI_OUTPUT_FILE} --protocol http
+node tools/scripts/generate-openapi.ts --output ${OPENAPI_OUTPUT_FILE} --protocol http
 ```
 
 ### **2. Gestor de Gateway (`create-gateway.sh`)**
@@ -165,16 +167,16 @@ node tools/openapi/scripts/generate-openapi.ts --output ${OPENAPI_OUTPUT_FILE} -
 bash tools/scripts/create-gateway.sh dev
 ```
 
-### **3. Wrapper Shell (`generate-openapi.sh`)**
+### **3. Sistema de Auto-Discovery**
 
-**Ubicación:** `tools/openapi/scripts/generate-openapi.sh`
+**Ubicación:** `tools/openapi/src/services/nx-workspace-discovery.ts`
 
 **Funcionalidades:**
 
-- 📁 **Carga de entorno**: Importa variables desde `.env.*`
-- ✅ **Validación**: Verifica dependencias y variables requeridas
-- 🏗️ **Build**: Compila librerías de dominio necesarias
-- 🔧 **Configuración**: Pasa parámetros correctos según entorno
+- 📁 **Análisis del workspace**: Utiliza configuración de Nx para descubrir proyectos automáticamente
+- 🔍 **Detección inteligente**: Encuentra proyectos API basándose en patrones de nombres y estructura
+- 📊 **Análisis de controladores**: Integra con sistema de análisis estático para extraer rutas
+- 🏗️ **Flexibilidad**: Soporta múltiples patrones de nombres de archivos (.controller.ts)
 
 ---
 
@@ -187,7 +189,7 @@ Todas las siguientes variables son **obligatorias** y deben estar definidas:
 ```bash
 # URLs de tus APIs (patrón: *_BACKEND_URL)
 USERS_BACKEND_URL=https://api-users-xxx.run.app/api
-ORDERS_BACKEND_URL=https://api-orders-xxx.run.app/api
+ORDERS_DETAIL_BACKEND_URL=https://api-orders-detail-xxx.run.app/api
 
 # Configuración del gateway
 GATEWAY_API_NAME=mi-empresa-api           # Nombre del API en Google Cloud
@@ -238,8 +240,9 @@ PAYMENTS_BACKEND_URL=https://api-payments-xxx.run.app/api
 **Requisitos para auto-discovery:**
 
 1. Variable termine en `_BACKEND_URL`
-2. App existe en `apps/api-{nombre}/`
-3. Módulo existe en `apps/api-{nombre}/src/app/app.module.ts` o `libs/{nombre}-domain/`
+2. Proyecto exista en la configuración del workspace Nx
+3. Archivos de controladores existan con patrones `.controller.ts`
+4. Estructura de proyecto siga convenciones de Nx monorepo
 
 ---
 
@@ -259,17 +262,18 @@ PAYMENTS_BACKEND_URL=https://api-payments-xxx.run.app/api
 - Confirma que las apps existan en `apps/api-*`
 - Revisa el archivo `.env.dev` o `.env.prod`
 
-#### **2. "Error cargando módulo"**
+#### **2. "Error analizando controladores"**
 
 ```bash
-❌ Error cargando módulo para users
+❌ Error analizando controladores para users
 ```
 
 **Solución:**
 
-- Verifica que el módulo exista en `apps/api-users/src/app/app.module.ts`
-- O alternativamente en `libs/users-domain/src/lib/users-domain.module.ts`
-- Ejecuta `nx build users-domain` antes de generar
+- Verifica que los archivos de controladores existan con extensión `.controller.ts`
+- Confirma que la sintaxis TypeScript sea válida
+- Revisa que los decoradores de NestJS estén correctamente importados
+- El proyecto debe estar en la configuración del workspace Nx
 
 #### **3. "Protocol field must be 'http/1.1' or 'h2'"**
 

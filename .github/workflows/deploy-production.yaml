@@ -14,7 +14,7 @@ on:
         options:
           - all
           - api-users
-          - api-orders
+          - api-orders-detail
           # - front-admin # Pendiente de habilitar cuando esté listo el front-admin
 
 env:
@@ -44,7 +44,7 @@ jobs:
         service:
           - name: api-users
             port: 3001
-          - name: api-orders
+          - name: api-orders-detail
             port: 3002
 
     steps:

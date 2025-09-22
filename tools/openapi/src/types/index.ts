@@ -9,12 +9,6 @@
  * Representa un módulo de servicio NestJS que puede ser instanciado
  * para la generación de documentación OpenAPI.
  */
-export interface ServiceModule {
-  /** Constructor del módulo */
-  new (...args: unknown[]): unknown;
-  /** Nombre del módulo para identificación */
-  name: string;
-}
 
 /**
  * Error que puede ocurrir durante la conversión de OpenAPI 3.0 a Swagger 2.0
@@ -87,8 +81,6 @@ export interface SecurityDefinition {
 export interface ServiceConfig {
   /** Nombre identificador del servicio */
   name: string;
-  /** Módulo NestJS del servicio (cargado dinámicamente) */
-  module: ServiceModule | null;
   /** Variable de entorno que contiene la URL del servicio */
   urlEnvVar: string;
   /** Prefijo de path para las rutas del servicio */
@@ -119,14 +111,6 @@ export interface Config {
   environment: 'dev' | 'prod';
   /** Límite de requests por minuto en Google Cloud */
   rateLimitPerMinute: number;
-}
-
-/**
- * Variables de entorno validadas para URLs de servicios
- */
-export interface ValidatedServiceUrls {
-  /** Mapeo de variable de entorno a URL validada */
-  [envVar: string]: string;
 }
 
 /**

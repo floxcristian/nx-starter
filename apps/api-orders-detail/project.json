@@ -1,7 +1,7 @@
 {
-  "name": "api-orders",
+  "name": "api-orders-detail",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/api-orders/src",
+  "sourceRoot": "apps/api-orders-detail/src",
   "projectType": "application",
   "tags": [],
   "targets": {
@@ -10,7 +10,7 @@
       "options": {
         "command": "webpack-cli build",
         "args": ["--node-env=production"],
-        "cwd": "apps/api-orders"
+        "cwd": "apps/api-orders-detail"
       },
       "configurations": {
         "development": {
@@ -23,8 +23,8 @@
       "cache": true,
       "executor": "@nx/js:prune-lockfile",
       "outputs": [
-        "{workspaceRoot}/dist/apps/api-orders/package.json",
-        "{workspaceRoot}/dist/apps/api-orders/pnpm-lock.yaml"
+        "{workspaceRoot}/dist/apps/api-orders-detail/package.json",
+        "{workspaceRoot}/dist/apps/api-orders-detail/pnpm-lock.yaml"
       ],
       "options": {
         "buildTarget": "build"
@@ -33,7 +33,9 @@
     "copy-workspace-modules": {
       "dependsOn": ["build"],
       "cache": true,
-      "outputs": ["{workspaceRoot}/dist/apps/api-orders/workspace_modules"],
+      "outputs": [
+        "{workspaceRoot}/dist/apps/api-orders-detail/workspace_modules"
+      ],
       "executor": "@nx/js:copy-workspace-modules",
       "options": {
         "buildTarget": "build"
@@ -49,15 +51,15 @@
       "defaultConfiguration": "development",
       "dependsOn": ["build"],
       "options": {
-        "buildTarget": "api-orders:build",
+        "buildTarget": "api-orders-detail:build",
         "runBuildTargetDependencies": false
       },
       "configurations": {
         "development": {
-          "buildTarget": "api-orders:build:development"
+          "buildTarget": "api-orders-detail:build:development"
         },
         "production": {
-          "buildTarget": "api-orders:build:production"
+          "buildTarget": "api-orders-detail:build:production"
         }
       }
     },
@@ -65,7 +67,7 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
-        "jestConfig": "apps/api-orders/jest.config.ts",
+        "jestConfig": "apps/api-orders-detail/jest.config.ts",
         "passWithNoTests": true
       }
     }

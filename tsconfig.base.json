@@ -15,6 +15,7 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@nx-starter/core-orders": ["libs/core-orders/src/index.ts"],
       "@nx-starter/orders-domain": ["libs/orders-domain/src/index.ts"],
       "@nx-starter/users-domain": ["libs/users-domain/src/index.ts"]
     }

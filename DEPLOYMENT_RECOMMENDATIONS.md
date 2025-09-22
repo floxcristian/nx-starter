@@ -5,7 +5,7 @@
 Considera agregar endpoints de health check en tus APIs:
 
 ```typescript
-// En api-orders/src/app/app.controller.ts
+// En api-orders-detail/src/app/app.controller.ts
 @Get('health')
 healthCheck() {
   return { status: 'ok', timestamp: new Date().toISOString() };

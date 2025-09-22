@@ -1,5 +1,5 @@
 export default {
-  displayName: 'api-orders-e2e',
+  displayName: 'api-orders-detail-e2e',
   preset: '../../jest.preset.js',
   globalSetup: '<rootDir>/src/support/global-setup.ts',
   globalTeardown: '<rootDir>/src/support/global-teardown.ts',
@@ -14,5 +14,5 @@ export default {
     ],
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/api-orders-e2e',
+  coverageDirectory: '../../coverage/api-orders-detail-e2e',
 };

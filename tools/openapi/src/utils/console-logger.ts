@@ -5,7 +5,7 @@
  * informativos, de error y de estado durante la ejecución.
  */
 
-import { Config, ServiceConfig, ValidatedServiceUrls } from '../types/index';
+import { Config, ServiceConfig } from '../types/index';
 
 /**
  * Niveles de log disponibles
@@ -90,13 +90,11 @@ export function logConfiguration(config: Config): void {
  * //    - Orders API: https://api.example.com/orders
  * ```
  */
-export function logServicesSummary(
-  services: ServiceConfig[],
-  serviceUrls: ValidatedServiceUrls
-): void {
+export function logServicesSummary(services: ServiceConfig[]): void {
   console.log('📡 URLs de servicios:');
   services.forEach((service) => {
-    console.log(`   - ${service.title}: ${serviceUrls[service.urlEnvVar]}`);
+    const url = process.env[service.urlEnvVar];
+    console.log(`   - ${service.title}: ${url || 'NO CONFIGURADA'}`);
   });
 }
 

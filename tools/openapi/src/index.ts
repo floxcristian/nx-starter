@@ -6,11 +6,7 @@
  */
 
 import { buildConfig } from './validators/config-validator';
-import {
-  discoverServices,
-  validateServiceUrls,
-} from './services/service-discovery';
-import { loadAllModules } from './services/module-loader';
+import { NxBasedOpenApiGenerator } from './services/nx-workspace-discovery';
 import {
   generateAllSwaggerDocuments,
   convertToSwagger2,
@@ -33,25 +29,23 @@ async function main(): Promise<void> {
     console.log('🔧 Iniciando generador OpenAPI...');
     const config = buildConfig();
 
-    // 2. Descubrir servicios disponibles
-    const services = discoverServices();
+    // 2. Descubrir servicios disponibles usando Nx
+    const nxGenerator = new NxBasedOpenApiGenerator();
+    const services = nxGenerator.generateServiceConfigs();
 
-    // 3. Validar URLs de servicios
-    const serviceUrls = validateServiceUrls(services) as Record<string, string>;
+    if (services.length === 0) {
+      throw new Error(
+        'No se encontraron servicios API configurados. Verifica tus variables de entorno *_BACKEND_URL'
+      );
+    }
+
+    console.log(`📊 Servicios descubiertos: ${services.length}`);
 
     // Mostrar configuración
     logConfiguration(config);
 
-    console.log('📡 URLs de servicios:');
-    Object.entries(serviceUrls).forEach(([key, url]) => {
-      console.log(`   - ${key}: ${url}`);
-    });
-
-    // 5. Cargar módulos de aplicación
-    await loadAllModules(services);
-
-    // 6. Generar documentos OpenAPI individuales
-    const documents = await generateAllSwaggerDocuments(services);
+    // 5. Generar documentos OpenAPI individuales usando el analizador estático
+    const documents = await generateAllSwaggerDocuments(nxGenerator);
 
     // 7. Combinar documentos en uno solo
     const combinedDocument = combineOpenAPIDocuments(
@@ -67,7 +61,6 @@ async function main(): Promise<void> {
     // 9. Mejorar especificación para Google Cloud
     const enhancedSpec = enhanceSpecificationForGoogleCloud(
       swaggerDocument,
-      serviceUrls,
       config,
       services
     );

@@ -5,7 +5,7 @@ import { OrdersService } from './services/orders.service';
 import { PaymentService } from './services/payment.service';
 
 // Controllers
-import { OrdersController } from './controllers/orders.controllers';
+import { OrdersController } from './controllers/orders.controller';
 
 @Module({
   controllers: [OrdersController],

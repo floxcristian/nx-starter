@@ -1,17 +1,17 @@
 {
-  "name": "api-orders-e2e",
+  "name": "api-orders-detail-e2e",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
-  "implicitDependencies": ["api-orders"],
+  "implicitDependencies": ["api-orders-detail"],
   "targets": {
     "e2e": {
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{e2eProjectRoot}"],
       "options": {
-        "jestConfig": "apps/api-orders-e2e/jest.config.ts",
+        "jestConfig": "apps/api-orders-detail-e2e/jest.config.ts",
         "passWithNoTests": true
       },
-      "dependsOn": ["api-orders:build", "api-orders:serve"]
+      "dependsOn": ["api-orders-detail:build", "api-orders-detail:serve"]
     }
   }
 }

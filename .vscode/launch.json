@@ -40,18 +40,18 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Debug api-orders with Nx",
+      "name": "Debug api-orders-detail with Nx",
       "runtimeExecutable": "pnpm exec",
-      "runtimeArgs": ["nx", "serve", "api-orders"],
+      "runtimeArgs": ["nx", "serve", "api-orders-detail"],
       "env": {
-        "NODE_OPTIONS": "--inspect=9231"
+        "NODE_OPTIONS": "--inspect=9232"
       },
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "skipFiles": ["<node_internals>/**"],
       "sourceMaps": true,
       "outFiles": [
-        "${workspaceFolder}/apps/api-orders/dist/**/*.(m|c|)js",
+        "${workspaceFolder}/apps/api-orders-detail/dist/**/*.(m|c|)js",
         "!**/node_modules/**"
       ]
     }

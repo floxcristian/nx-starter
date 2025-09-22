@@ -1,10 +1,10 @@
 export default {
-  displayName: 'api-orders',
+  displayName: 'api-orders-detail',
   preset: '../../jest.preset.js',
   testEnvironment: 'node',
   transform: {
     '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/apps/api-orders',
+  coverageDirectory: '../../coverage/apps/api-orders-detail',
 };

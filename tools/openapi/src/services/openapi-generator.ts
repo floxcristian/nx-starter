@@ -5,12 +5,9 @@
  * combinar múltiples servicios y convertir el formato final.
  */
 
-import { NestFactory } from '@nestjs/core';
-import { SwaggerModule, DocumentBuilder, OpenAPIObject } from '@nestjs/swagger';
+import { OpenAPIObject } from '@nestjs/swagger';
 import { OpenAPIV3 } from 'openapi-types';
 import {
-  ServiceModule,
-  ServiceConfig,
   SwaggerV2Document,
   ConversionResult,
   ConversionError,
@@ -20,96 +17,36 @@ import {
 const Converter = require('api-spec-converter');
 
 /**
- * Genera un documento Swagger/OpenAPI desde un módulo NestJS
+ * Genera documentos OpenAPI para todos los servicios usando el sistema Nx
  *
- * Crea una aplicación NestJS temporal, configura Swagger y extrae
- * la especificación OpenAPI generada desde el código real.
- *
- * @param appModule - Módulo NestJS a procesar
- * @param title - Título para la documentación
- * @returns Promise que resuelve al documento OpenAPI generado
- *
- * @example
- * ```typescript
- * const UsersModule = await import('./users.module');
- * const doc = await buildSwaggerDocument(UsersModule.AppModule, 'Users API');
- * console.log(`Generado documento con ${Object.keys(doc.paths).length} paths`);
- * ```
- *
- * @throws {Error} Si falla la creación de la aplicación o generación del documento
- */
-export async function buildSwaggerDocument(
-  appModule: ServiceModule,
-  title: string
-): Promise<OpenAPIObject> {
-  console.log(`   🏗️  Creando aplicación NestJS para ${title}...`);
-
-  // Crear aplicación temporal sin logs para extracción limpia
-  const app = await NestFactory.create(appModule, {
-    logger: false,
-    abortOnError: false,
-  });
-
-  try {
-    console.log(`   📋 Configurando Swagger para ${title}...`);
-
-    // Configurar Swagger con metadata básica
-    const config = new DocumentBuilder()
-      .setTitle(title)
-      .setDescription(`API del servicio ${title}`)
-      .setVersion('1.0')
-      .addBearerAuth({ type: 'http', bearerFormat: 'JWT' })
-      .build();
-
-    console.log(`   📊 Generando documento OpenAPI para ${title}...`);
-    const document = SwaggerModule.createDocument(app, config);
-
-    return document;
-  } finally {
-    console.log(`   🔧 Cerrando aplicación ${title}...`);
-    await app.close();
-  }
-}
-
-/**
- * Genera documentos OpenAPI para todos los servicios configurados
- *
- * @param services - Array de configuraciones de servicios con módulos cargados
+ * @param nxGenerator - Instancia del generador basado en Nx
  * @returns Promise que resuelve a array de documentos generados
  *
  * @example
  * ```typescript
- * const services = await loadAllModules(serviceConfigs);
- * const documents = await generateAllSwaggerDocuments(services);
+ * const nxGenerator = new NxBasedOpenApiGenerator();
+ * const documents = await generateAllSwaggerDocuments(nxGenerator);
  * console.log(`Generados ${documents.length} documentos`);
  * ```
  *
  * @throws {Error} Si falla la generación de cualquier documento
  */
-export async function generateAllSwaggerDocuments(
-  services: ServiceConfig[]
-): Promise<OpenAPIObject[]> {
-  console.log('🚀 Generando especificaciones reales desde código...');
-
-  const documents = await Promise.all(
-    services.map(async (service) => {
-      console.log(`🔧 Procesando ${service.title}...`);
-
-      try {
-        if (!service.module) {
-          throw new Error(`Módulo no cargado para ${service.title}`);
-        }
-
-        const doc = await buildSwaggerDocument(service.module, service.title);
-        console.log(`   ✅ ${service.title} completado`);
-        return doc;
-      } catch (error) {
-        console.error(`   ❌ Error generando ${service.title}:`, error);
-        throw error;
-      }
-    })
+export async function generateAllSwaggerDocuments(nxGenerator: {
+  generate(): Promise<Record<string, unknown>>;
+}): Promise<OpenAPIObject[]> {
+  console.log(
+    '🚀 Generando especificaciones desde análisis de controladores...'
   );
 
+  // Generar specs usando el analizador estático
+  const individualSpecs = await nxGenerator.generate();
+
+  // Convertir a formato OpenAPIObject[]
+  const documents: OpenAPIObject[] = Object.values(
+    individualSpecs
+  ) as OpenAPIObject[];
+
+  console.log(`✅ Generados ${documents.length} documentos con rutas reales`);
   return documents;
 }
 
