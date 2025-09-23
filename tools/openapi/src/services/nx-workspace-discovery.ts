@@ -1,17 +1,78 @@
 /**
- * @fileoverview Generador avanzado de OpenAPI unificado
+ * @fileoverview Generador de OpenAPI basado en el workspace de Nx.
  *
- * Descubre automáticamente APIs y librerías usando el workspace de Nx,
- * genera specs individuales y los combina en un único archivo Swagger 2.0
- * optimizado para Google Cloud API Gateway.
+ * Descubre automáticamente APIs y librerías usando el grafo de proyectos de Nx,
+ * para luego delegar el análisis de controladores y la generación de specs.
  */
 
-import { existsSync } from 'fs';
+import { readFileSync } from 'fs';
 import { join } from 'path';
 import { execSync } from 'child_process';
 import type { ServiceConfig } from '../types/index';
-import { ControllerAnalyzer, type ControllerInfo } from './controller-analyzer';
+import {
+  ControllerAnalyzer,
+  type ControllerInfo,
+  type SchemaObject,
+} from './controller-analyzer';
+import type { OpenAPIV3 } from 'openapi-types';
 
+// --- Type Definitions for Swagger 2.0 --- //
+
+/** Representa un parámetro en una operación de Swagger 2.0. */
+interface SwaggerParameter {
+  name: string;
+  in: 'path' | 'query' | 'body' | 'header' | 'formData';
+  required?: boolean;
+  description?: string;
+  schema?: SchemaObject | OpenAPIV3.ReferenceObject;
+  [key: string]: unknown; // For other properties like 'type', 'format', etc.
+}
+
+/** Representa una respuesta en una operación de Swagger 2.0. */
+interface SwaggerResponse {
+  description: string;
+  schema?: SchemaObject | OpenAPIV3.ReferenceObject;
+}
+
+/** Representa una operación (un método en una ruta) en Swagger 2.0. */
+interface SwaggerOperation {
+  summary?: string;
+  operationId?: string;
+  tags?: string[];
+  parameters?: SwaggerParameter[];
+  responses: Record<string, SwaggerResponse>;
+  [key: string]: unknown; // For extensions like x-google-backend
+}
+
+// --- Nx-specific Interfaces --- //
+
+/**
+ * Define la estructura del grafo de proyectos generado por `nx graph`.
+ */
+interface NxProjectGraph {
+  nodes: Record<
+    string,
+    {
+      name: string;
+      type: 'app' | 'lib' | 'e2e';
+      data: {
+        root: string;
+        projectType: 'application' | 'library';
+        tags?: string[];
+      };
+    }
+  >;
+  dependencies: Record<
+    string,
+    Array<{
+      source: string;
+      target: string;
+      type: 'static' | 'dynamic' | 'implicit';
+    }>
+  >;
+}
+
+/** Representa un proyecto de API descubierto en el workspace. */
 interface ApiProject {
   name: string;
   path: string;
@@ -21,6 +82,7 @@ interface ApiProject {
   dependencies: string[];
 }
 
+/** Configuración interna de un servicio, mapeando URL y nombre. */
 interface InternalServiceConfig {
   url: string;
   basePath: string;
@@ -28,13 +90,16 @@ interface InternalServiceConfig {
   envVar: string;
 }
 
+/** Representa la configuración de un proyecto Nx. */
 interface NxProjectConfig {
   name: string;
   root: string;
   projectType: 'application' | 'library';
   implicitDependencies?: string[];
+  tags?: string[];
 }
 
+/** Representa una especificación OpenAPI para un único servicio. */
 export interface OpenApiSpec {
   openapi: string;
   info: {
@@ -46,17 +111,26 @@ export interface OpenApiSpec {
     url: string;
     description: string;
   }>;
-  paths: Record<string, unknown>;
+  paths: OpenAPIV3.PathsObject;
   components: {
-    schemas: Record<string, unknown>;
+    schemas: Record<string, SchemaObject | OpenAPIV3.ReferenceObject>;
+    securitySchemes?: Record<
+      string,
+      OpenAPIV3.SecuritySchemeObject | OpenAPIV3.ReferenceObject
+    >;
   };
   tags: Array<{ name: string }>;
   dependencies?: string[];
 }
 
+/**
+ * Clase principal para descubrir APIs y generar especificaciones OpenAPI
+ * a partir de un workspace de Nx.
+ */
 export class NxBasedOpenApiGenerator {
   private workspaceRoot: string;
   private projects: Map<string, NxProjectConfig> = new Map();
+  private projectGraph: NxProjectGraph | null = null;
   private serviceConfigs: Map<string, InternalServiceConfig> = new Map();
   private apiProjects: ApiProject[] = [];
 
@@ -67,55 +141,61 @@ export class NxBasedOpenApiGenerator {
   }
 
   /**
-   * Cargar la configuración del workspace de Nx
+   * Carga la configuración del workspace de Nx de forma eficiente generando y leyendo el grafo de proyectos.
    */
   private loadNxWorkspace(): void {
     console.log('📋 Cargando configuración del workspace Nx...');
+    const graphOutputFile = join(this.workspaceRoot, 'dist', 'project-graph.json');
 
-    // Intentar cargar nx.json
-    const nxJsonPath = join(this.workspaceRoot, 'nx.json');
-    if (existsSync(nxJsonPath)) {
-      console.log(`   ✅ nx.json encontrado`);
-    }
-
-    // Usar nx para obtener la configuración de proyectos
     try {
-      const projectsOutput = execSync('npx nx show projects --json', {
+      console.log('   ⏳ Generando grafo de proyectos de Nx...');
+      execSync(`npx nx graph --file=${graphOutputFile}`, {
         encoding: 'utf8',
         cwd: this.workspaceRoot,
+        stdio: 'pipe',
       });
+      console.log(`   ✅ Grafo de proyectos guardado en ${graphOutputFile}`);
 
-      const projectNames = JSON.parse(projectsOutput);
+      const graphOutput = readFileSync(graphOutputFile, 'utf8');
+      let graphData = JSON.parse(graphOutput);
 
-      for (const projectName of projectNames) {
-        try {
-          const projectConfigOutput = execSync(
-            `npx nx show project ${projectName} --json`,
-            {
-              encoding: 'utf8',
-              cwd: this.workspaceRoot,
-            }
-          );
+      if (graphData.graph) {
+        graphData = graphData.graph;
+      }
 
-          const projectConfig = JSON.parse(projectConfigOutput);
-          this.projects.set(projectName, projectConfig);
+      if (!graphData.nodes || !graphData.dependencies) {
+        throw new Error(
+          'El formato del grafo de proyectos no es válido o está vacío.'
+        );
+      }
+      this.projectGraph = graphData;
+
+      if (this.projectGraph && this.projectGraph.nodes) {
+        for (const projectName in this.projectGraph.nodes) {
+          const projectNode = this.projectGraph.nodes[projectName];
+          const projectData = projectNode.data;
+
+          this.projects.set(projectName, {
+            name: projectNode.name,
+            root: projectData.root,
+            projectType: projectData.projectType,
+            tags: projectData.tags || [],
+          });
           console.log(
-            `   ✅ ${projectName}: ${projectConfig.projectType || 'unknown'}`
-          );
-        } catch {
-          console.warn(
-            `   ⚠️  No se pudo cargar configuración de ${projectName}`
+            `   ✅ ${projectNode.name}: ${projectData.projectType || 'unknown'}`
           );
         }
       }
     } catch (error) {
-      console.error('❌ Error cargando proyectos de Nx:', error);
-      throw new Error('No se pudo cargar la configuración del workspace');
+      console.error('❌ Error cargando el grafo de proyectos de Nx:', error);
+      throw new Error(
+        'No se pudo cargar la configuración del workspace de Nx.'
+      );
     }
   }
 
   /**
-   * Cargar configuraciones de servicios desde variables de entorno
+   * Carga las configuraciones de servicios (URLs) a partir de las variables de entorno.
    */
   private loadServiceConfigurations(): void {
     console.log('🔍 Buscando configuraciones de servicios...');
@@ -127,10 +207,9 @@ export class NxBasedOpenApiGenerator {
       const match = key.match(backendUrlPattern);
 
       if (match && value) {
-        const envPrefix = match[1]; // ej: "USERS", "ORDERS_DETAIL"
-        const serviceName = envPrefix.toLowerCase().replace(/_/g, '-'); // "users", "orders-detail"
+        const envPrefix = match[1];
+        const serviceName = envPrefix.toLowerCase().replace(/_/g, '-');
 
-        // Buscar el proyecto correspondiente (puede ser api-users, api-orders-detail, etc)
         const matchingProject = this.findMatchingApiProject(serviceName);
 
         if (matchingProject) {
@@ -154,16 +233,16 @@ export class NxBasedOpenApiGenerator {
   }
 
   /**
-   * Buscar proyecto API que coincida con el nombre del servicio
+   * Busca un proyecto de API que coincida con un nombre de servicio derivado de una variable de entorno.
+   * @param serviceName El nombre del servicio (ej. 'users', 'orders-detail').
+   * @returns El nombre del proyecto correspondiente (ej. 'api-users') o null.
    */
   private findMatchingApiProject(serviceName: string): string | null {
-    // Buscar coincidencia exacta primero (excluyendo -e2e)
     const exactMatch = `api-${serviceName}`;
     if (this.projects.has(exactMatch) && !exactMatch.endsWith('-e2e')) {
       return exactMatch;
     }
 
-    // Buscar coincidencias parciales (ej: orders-detail podría coincidir con api-orders-detail)
     for (const [projectName, config] of Array.from(this.projects.entries())) {
       if (
         projectName.startsWith('api-') &&
@@ -180,7 +259,7 @@ export class NxBasedOpenApiGenerator {
   }
 
   /**
-   * Descubrir proyectos API y sus dependencias
+   * Descubre los proyectos de API basándose en sus tags y prepara su configuración.
    */
   private discoverApiProjects(): void {
     console.log('🔍 Descubriendo proyectos API y dependencias...');
@@ -188,11 +267,9 @@ export class NxBasedOpenApiGenerator {
     for (const [projectName, projectConfig] of Array.from(
       this.projects.entries()
     )) {
-      // Solo procesar aplicaciones que empiecen con 'api-' pero NO terminen con '-e2e'
       if (
-        projectName.startsWith('api-') &&
-        !projectName.endsWith('-e2e') &&
-        projectConfig.projectType === 'application'
+        projectConfig.projectType === 'application' &&
+        projectConfig.tags?.includes('scope:gcp-gateway')
       ) {
         const serviceConfig = this.serviceConfigs.get(projectName);
         const dependencies = this.getProjectDependencies(projectName);
@@ -217,48 +294,32 @@ export class NxBasedOpenApiGenerator {
   }
 
   /**
-   * Obtener dependencias de un proyecto usando Nx (versión simplificada)
+   * Obtiene las dependencias de un proyecto a partir del grafo de Nx ya cargado.
+   * @param projectName El nombre del proyecto.
+   * @returns Un array con los nombres de sus dependencias (excluyendo paquetes de npm).
    */
   private getProjectDependencies(projectName: string): string[] {
-    try {
-      // Usar command de Nx para obtener dependencias directamente
-      const depsOutput = execSync(`npx nx show project ${projectName} --json`, {
-        encoding: 'utf8',
-        cwd: this.workspaceRoot,
-      });
-
-      // Parsear la salida que incluye tanto project details como dependencies
-      const lines = depsOutput.split('\n');
-
-      // Buscar línea que contenga "Project Dependencies:"
-      const depsLineIndex = lines.findIndex((line) =>
-        line.includes('Project Dependencies:')
-      );
-
-      if (depsLineIndex >= 0 && depsLineIndex < lines.length - 1) {
-        const depsLine = lines[depsLineIndex];
-        const depsMatch = depsLine.match(/Project Dependencies:\s*(.+)/);
-
-        if (depsMatch && depsMatch[1] && depsMatch[1].trim() !== '') {
-          const dependencies = depsMatch[1].split(',').map((dep) => dep.trim());
-          return dependencies.filter((dep) => dep && !dep.startsWith('npm:'));
-        }
-      }
-
-      return [];
-    } catch (error) {
-      console.warn(
-        `   ⚠️  No se pudieron obtener dependencias de ${projectName}:`,
-        error
-      );
+    if (!this.projectGraph || !this.projectGraph.dependencies) {
+      console.warn(`   ⚠️  No se pudo encontrar el grafo de dependencias.`);
       return [];
     }
+
+    const projectDependencies = this.projectGraph.dependencies[projectName];
+
+    if (!projectDependencies) {
+      return [];
+    }
+
+    return projectDependencies
+      .map((dep) => dep.target)
+      .filter((depName) => !depName.startsWith('npm:'));
   }
 
   /**
-   * Generar specs individuales para cada API
+   * Genera las especificaciones OpenAPI individuales para cada API descubierta.
+   * @returns Un record donde las claves son los nombres de los proyectos y los valores son sus OpenApiSpec.
    */
-  private async generateIndividualSpecs(): Promise<
+  public async generateIndividualSpecs(): Promise<
     Record<string, OpenApiSpec>
   > {
     console.log('📊 Generando especificaciones individuales...');
@@ -269,7 +330,6 @@ export class NxBasedOpenApiGenerator {
       try {
         console.log(`   🔧 Procesando ${project.name}...`);
 
-        // Intentar cargar el módulo principal
         const spec = await this.extractSwaggerFromProject(project);
 
         if (spec) {
@@ -287,17 +347,17 @@ export class NxBasedOpenApiGenerator {
   }
 
   /**
-   * Extraer configuración Swagger de un proyecto usando análisis estático
+   * Extrae la configuración Swagger de un proyecto usando el analizador estático.
+   * @param project El proyecto de API a analizar.
+   * @returns La especificación OpenAPI para ese proyecto.
    */
   private async extractSwaggerFromProject(
     project: ApiProject
   ): Promise<OpenApiSpec> {
     console.log(`   🔍 Analizando controladores para ${project.name}...`);
 
-    // Analizar controladores en todas las librerías de dominio disponibles
     const allControllers: ControllerInfo[] = [];
 
-    // Buscar en todas las librerías
     for (const [libName, libProject] of Array.from(this.projects.entries())) {
       if (libProject.projectType === 'library') {
         const libPath = join(this.workspaceRoot, libProject.root);
@@ -312,13 +372,16 @@ export class NxBasedOpenApiGenerator {
       }
     }
 
-    // También analizar el proyecto principal por si acaso
     const projectPath = join(this.workspaceRoot, project.path);
     const projectControllers =
       ControllerAnalyzer.analyzeProjectControllers(projectPath);
     allControllers.push(...projectControllers);
 
-    // Crear spec OpenAPI con rutas reales
+    const allSchemas: Record<string, SchemaObject | OpenAPIV3.ReferenceObject> = {};
+    for (const controllerInfo of allControllers) {
+      Object.assign(allSchemas, controllerInfo.schemas);
+    }
+
     const spec: OpenApiSpec = {
       openapi: '3.0.0',
       info: {
@@ -331,7 +394,7 @@ export class NxBasedOpenApiGenerator {
         project.basePath || ''
       ),
       components: {
-        schemas: {},
+        schemas: allSchemas,
       },
       tags: this.extractTagsFromControllers(allControllers, project.name),
       dependencies: project.dependencies,
@@ -352,15 +415,17 @@ export class NxBasedOpenApiGenerator {
   }
 
   /**
-   * Construir paths de OpenAPI desde información de controladores
+   * Construye el objeto `paths` de OpenAPI a partir de la información de los controladores.
+   * @param controllers La información extraída de los controladores.
+   * @param serviceBasePath El path base del servicio.
+   * @returns Un objeto `paths` para la especificación OpenAPI.
    */
   private buildPathsFromControllers(
     controllers: ControllerInfo[],
     serviceBasePath: string
-  ): Record<string, unknown> {
-    const paths: Record<string, unknown> = {};
+  ): Record<string, Record<string, SwaggerOperation>> {
+    const paths: Record<string, Record<string, SwaggerOperation>> = {};
 
-    // Añadir ruta de health check
     const healthPath = `${serviceBasePath}/health`;
     paths[healthPath] = {
       get: {
@@ -369,15 +434,11 @@ export class NxBasedOpenApiGenerator {
         responses: {
           '200': {
             description: 'Service is healthy',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    status: { type: 'string', example: 'ok' },
-                    service: { type: 'string' },
-                  },
-                },
+            schema: {
+              type: 'object',
+              properties: {
+                status: { type: 'string', example: 'ok' },
+                service: { type: 'string' },
               },
             },
           },
@@ -386,10 +447,8 @@ export class NxBasedOpenApiGenerator {
       },
     };
 
-    // Procesar rutas de controladores
     for (const controller of controllers) {
       for (const route of controller.routes) {
-        // Convertir parámetros de path de Express (:id) a OpenAPI ({id})
         const openApiPath = route.path.replace(/:(\w+)/g, '{$1}');
         const fullPath = openApiPath.startsWith('/')
           ? openApiPath
@@ -399,9 +458,7 @@ export class NxBasedOpenApiGenerator {
           paths[fullPath] = {};
         }
 
-        // Construir definición de operación
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const operation: Record<string, any> = {
+        const operation: SwaggerOperation = {
           summary:
             route.summary || `${route.method.toUpperCase()} ${route.path}`,
           operationId:
@@ -411,69 +468,67 @@ export class NxBasedOpenApiGenerator {
           responses: {},
         };
 
-        // Añadir parámetros
         if (route.parameters && route.parameters.length > 0) {
-          operation['parameters'] = route.parameters.map((param) => ({
-            name: param.name,
-            in: param.in,
-            required: param.required || false,
-            schema: {
-              type: param.type || 'string',
-            },
-            description: param.description,
-          }));
+          operation.parameters = route.parameters.map((param) => {
+            // Los parámetros 'body' anidan el schema.
+            if (param.in === 'body') {
+              return {
+                name: param.name,
+                in: param.in,
+                required: param.required,
+                description: param.description,
+                schema: param.schema,
+              };
+            }
+
+            // Los parámetros que no son 'body' (path, query) tienen las propiedades
+            // del schema al nivel superior (según la especificación Swagger 2.0).
+            const { schema, ...baseParam } = param;
+
+            // Comprobamos si el schema es un objeto de referencia o un objeto de schema.
+            if (schema && '$ref' in schema) {
+              // Swagger 2.0 no soporta $ref directamente en parámetros que no son 'body'.
+              // Se podría implementar una lógica para resolver la referencia, pero por ahora
+              // es más seguro omitirlo y registrar una advertencia.
+              console.warn(
+                `ADVERTENCIA: $ref en el parámetro "${param.name}" (que no es 'body') no está soportado en la conversión a Swagger 2.0.`
+              );
+              return baseParam;
+            } else {
+              // Si es un SchemaObject, expandimos sus propiedades,
+              // pero excluimos su propiedad 'required' para evitar conflictos.
+              // Usamos desestructuración para separar 'required' del resto de las
+              // propiedades del schema. Nombramos la variable con '_' para indicar
+              // que es intencionadamente no utilizada, evitando errores del linter.
+              const { required: _schemaRequired, ...schemaProps } = schema;
+
+              return {
+                ...baseParam,
+                ...schemaProps,
+              };
+            }
+          });
         }
 
-        // Añadir request body para métodos que lo requieren
-        if (['post', 'put', 'patch'].includes(route.method)) {
-          const bodyParam = route.parameters?.find((p) => p.in === 'body');
-          if (bodyParam) {
-            operation['requestBody'] = {
-              required: true,
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'object',
-                  },
-                },
-              },
-            };
-          }
-        }
-
-        // Añadir respuestas
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const responses: Record<string, any> = {};
+        const finalResponses: Record<string, SwaggerResponse> = {};
         if (route.responses && route.responses.length > 0) {
-          for (const response of route.responses) {
-            responses[response.statusCode] = {
-              description: response.description,
-              content: {
-                'application/json': {
-                  schema: {
-                    type: 'object',
-                  },
-                },
-              },
+          for (const res of route.responses) {
+            const responseContent: SwaggerResponse = {
+              description: res.description,
             };
+            if (res.schema) {
+              responseContent.schema = res.schema;
+            }
+            finalResponses[res.statusCode] = responseContent;
           }
         } else {
-          // Respuesta por defecto
-          responses['200'] = {
+          finalResponses['200'] = {
             description: 'Success',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                },
-              },
-            },
           };
         }
-        operation['responses'] = responses;
+        operation.responses = finalResponses;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (paths[fullPath] as Record<string, any>)[route.method] = operation;
+        paths[fullPath][route.method] = operation;
       }
     }
 
@@ -481,7 +536,10 @@ export class NxBasedOpenApiGenerator {
   }
 
   /**
-   * Extraer tags desde controladores
+   * Extrae todos los tags únicos de los controladores analizados.
+   * @param controllers La información de los controladores.
+   * @param projectName El nombre del proyecto (usado como fallback).
+   * @returns Un array de objetos de tag para OpenAPI.
    */
   private extractTagsFromControllers(
     controllers: ControllerInfo[],
@@ -489,16 +547,13 @@ export class NxBasedOpenApiGenerator {
   ): Array<{ name: string }> {
     const tags = new Set<string>();
 
-    // Añadir tag de health
     tags.add('health');
 
-    // Extraer tags de controladores
     for (const controller of controllers) {
       if (controller.tags) {
         controller.tags.forEach((tag) => tags.add(tag));
       }
 
-      // También añadir tags de rutas individuales
       for (const route of controller.routes) {
         if (route.tags) {
           route.tags.forEach((tag) => tags.add(tag));
@@ -506,9 +561,7 @@ export class NxBasedOpenApiGenerator {
       }
     }
 
-    // Si no hay tags, usar el nombre del proyecto
     if (tags.size === 1) {
-      // Solo 'health'
       tags.add(projectName.replace('api-', ''));
     }
 
@@ -516,7 +569,8 @@ export class NxBasedOpenApiGenerator {
   }
 
   /**
-   * Generar configuraciones de servicios compatibles con el sistema existente
+   * Genera la configuración de servicios compatible con el resto del sistema.
+   * @returns Un array de `ServiceConfig`.
    */
   generateServiceConfigs(): ServiceConfig[] {
     this.discoverApiProjects();
@@ -525,7 +579,6 @@ export class NxBasedOpenApiGenerator {
 
     for (const project of this.apiProjects) {
       if (project.serviceUrl) {
-        // Solo incluir servicios con URL configurada
         services.push({
           name: project.name.replace('api-', ''),
           urlEnvVar: this.findEnvVarForProject(project.name),
@@ -540,7 +593,9 @@ export class NxBasedOpenApiGenerator {
   }
 
   /**
-   * Encontrar variable de entorno para un proyecto
+   * Encuentra la variable de entorno asociada a un nombre de proyecto.
+   * @param projectName El nombre del proyecto.
+   * @returns El nombre de la variable de entorno.
    */
   private findEnvVarForProject(projectName: string): string {
     for (const [envVar, config] of Array.from(this.serviceConfigs.entries())) {
@@ -549,7 +604,6 @@ export class NxBasedOpenApiGenerator {
       }
     }
 
-    // Fallback: generar nombre esperado
     const cleanName = projectName
       .replace('api-', '')
       .replace(/-/g, '_')
@@ -558,7 +612,9 @@ export class NxBasedOpenApiGenerator {
   }
 
   /**
-   * Generar título legible para un servicio
+   * Genera un título legible para un servicio a partir de su nombre de proyecto.
+   * @param projectName El nombre del proyecto.
+   * @returns Un título legible.
    */
   private generateTitle(projectName: string): string {
     return (
@@ -569,41 +625,4 @@ export class NxBasedOpenApiGenerator {
         .join(' ') + ' API'
     );
   }
-
-  /**
-   * Método principal (mantenido para compatibilidad)
-   */
-  async generate(): Promise<Record<string, OpenApiSpec>> {
-    console.log(
-      '🚀 Iniciando generación de OpenAPI unificado (basado en Nx)...'
-    );
-    console.log(`🌍 Workspace: ${this.workspaceRoot}`);
-
-    // 1. Descubrir proyectos API automáticamente
-    this.discoverApiProjects();
-    console.log(`📊 Encontrados ${this.apiProjects.length} proyectos API`);
-    console.log(
-      `🔗 Configurados ${this.serviceConfigs.size} servicios con URLs`
-    );
-
-    if (this.apiProjects.length === 0) {
-      throw new Error('No se encontraron proyectos API para procesar');
-    }
-
-    // 2. Generar specs individuales
-    const individualSpecs = await this.generateIndividualSpecs();
-
-    console.log(
-      `✅ Generación completada con ${
-        Object.keys(individualSpecs).length
-      } specs`
-    );
-
-    return individualSpecs;
-  }
-}
-
-// Ejecutar si es llamado directamente
-if (require.main === module) {
-  new NxBasedOpenApiGenerator().generate().catch(console.error);
 }

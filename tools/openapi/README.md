@@ -1,359 +1,128 @@
-# OpenAPI Tools
+# Herramienta de Generación de OpenAPI
 
-Genera especificaciones OpenAPI para Google Cloud API Gateway con auto-discovery de servicios NestJS y análisis estático de controladores.
+Este directorio contiene una herramienta para generar especificaciones OpenAPI v2 (Swagger) para Google Cloud API Gateway. Realiza un análisis estático de un monorepo de Nx para descubrir APIs de NestJS, analizar sus controladores y DTOs, y generar una especificación OpenAPI unificada.
 
-## Arquitectura
+## ✨ Características Principales
+
+- ✅ **Análisis Estático del AST**: Utiliza el compilador de TypeScript (`ts.Program` y `TypeChecker`) para analizar el código fuente sin necesidad de ejecutar las aplicaciones.
+- ✅ **Descubrimiento Basado en Grafo de Nx**: Ejecuta `nx graph` para obtener una vista completa del workspace, descubriendo proyectos y sus dependencias de forma eficiente.
+- ✅ **Descubrimiento por Tags**: Identifica las APIs a incluir buscando el tag `scope:gcp-gateway` en los `project.json`.
+- ✅ **Generación de Schemas a partir de DTOs**: Analiza los DTOs (Data Transfer Objects) utilizados en los decoradores `@Body()` y `@ApiResponse()` para generar automáticamente los schemas correspondientes.
+- ✅ **Conversión a Swagger 2.0**: Convierte la especificación final a Swagger 2.0, el formato requerido por Google Cloud API Gateway.
+- ✅ **Mejoras para Google Cloud**: Añade automáticamente las extensiones `x-google-*` necesarias para la configuración del backend y la seguridad.
+
+## 🏗️ Arquitectura Interna
+
+El generador sigue un flujo de ejecución modular:
 
 ```
 tools/openapi/src/
-├── index.ts                      # Orquestador principal
-├── types/index.ts               # Interfaces TypeScript centralizadas
+├── index.ts                      # Orquestador principal del proceso.
+├── types/                        # Interfaces y tipos de TypeScript centralizados.
 ├── validators/
-│   └── config-validator.ts      # Validación y configuración del gateway
+│   └── config-validator.ts       # Valida las variables de entorno y construye la configuración.
 ├── services/
-│   ├── controller-analyzer.ts   # Análisis estático de controladores TypeScript
-│   ├── nx-workspace-discovery.ts # Auto-discovery basado en workspace Nx
-│   ├── openapi-generator.ts     # Generación de especificaciones OpenAPI
-│   └── google-cloud-enhancer.ts # Optimización para Google Cloud
-└── utils/
-    ├── file-utils.ts            # Escritura de archivos
-    ├── console-logger.ts        # Logging estructurado
-    └── url-utils.ts             # Validación y manejo de URLs
+│   ├── nx-workspace-discovery.ts # Lógica para descubrir proyectos usando el grafo de Nx.
+│   ├── controller-analyzer.ts    # Analizador estático que usa el TypeChecker de TS para analizar controladores y DTOs.
+│   ├── openapi-generator.ts      # Ensambla las especificaciones individuales en un único documento.
+│   └── google-cloud-enhancer.ts  # Añade las extensiones específicas de Google Cloud.
+└── utils/                        # Utilidades para logging y manejo de archivos.
 ```
 
-**Funcionalidades:**
+### Flujo de Ejecución
 
-- **Análisis estático de controladores**: Extrae rutas de archivos TypeScript sin cargar módulos dinámicamente
-- **Auto-discovery basado en Nx**: Utiliza la configuración del workspace para descubrir servicios automáticamente
-- **Filtrado inteligente**: Ignora automáticamente aplicaciones de test end-to-end (que terminan en `-e2e`)
-- **Detección automática de librerías**: Encuentra controladores en librerías
-- **Conversión automática**: OpenAPI 3.0 → Swagger 2.0 para compatibilidad con Google Cloud
-- **Configuración específica para Google Cloud API Gateway**
+1.  **Validación de Configuración**: `config-validator.ts` lee y valida las variables de entorno.
+2.  **Descubrimiento del Workspace**: `nx-workspace-discovery.ts` ejecuta `nx graph`, lo parsea y encuentra todos los proyectos con el tag `scope:gcp-gateway`.
+3.  **Análisis de Controladores y DTOs**: Para cada proyecto, `controller-analyzer.ts` recorre el AST, extrae rutas, métodos, y usa el `TypeChecker` para analizar los DTOs en `@Body()` y `@ApiResponse()`, generando un mapa de `schemas`.
+4.  **Generación y Conversión**: `openapi-generator.ts` combina todo en una especificación OpenAPI 3.0, que luego se convierte a Swagger 2.0.
+5.  **Mejora para GCP**: `google-cloud-enhancer.ts` añade las extensiones `x-google-*`.
+6.  **Escritura**: El `openapi.yaml` final se escribe en el disco.
 
-**Flujo de ejecución:**
-Validación → Descubrimiento Nx → Análisis Estático → Generación → Combinación → Optimización → Escritura
+## 🚀 Uso
 
-## Uso con Nx
+La herramienta se ejecuta a través de los scripts de `npm` definidos en el `package.json` raíz.
 
-### Comandos Nx disponibles:
+### Comandos de Alto Nivel (Recomendados)
 
-```bash
-# Generar especificación OpenAPI para desarrollo
-nx run openapi-tools:generate:dev
+| Comando                | Descripción                    |
+| ---------------------- | ------------------------------ |
+| `npm run gateway:dev`  | Flujo completo para desarrollo (Genera + Despliega + Crea) |
+| `npm run gateway:prod` | Flujo completo para producción (Genera + Despliega + Crea) |
 
-# Generar especificación OpenAPI para producción
-nx run openapi-tools:generate:prod
+### Comandos Granulares (Para Debugging)
 
-# Desplegar configuración a Google Cloud (desarrollo)
-nx run openapi-tools:deploy:dev
+| Comando                        | Descripción                               |
+| ------------------------------ | ----------------------------------------- |
+| `npm run openapi:generate:dev` | Solo genera el archivo `openapi.yaml`     |
+| `npm run gateway:deploy:dev`   | Solo despliega la config en GCP           |
+| `npm run gateway:create:dev`   | Solo crea/actualiza el gateway con la última config |
 
-# Desplegar configuración a Google Cloud (producción)
-nx run openapi-tools:deploy:prod
+## ⚙️ Configuración
 
-# Crear gateway completo (desarrollo) - incluye deploy
-nx run openapi-tools:gateway:dev
+Utiliza archivos `.env.{environment}` en la raíz del workspace.
 
-# Crear gateway completo (producción) - incluye deploy
-nx run openapi-tools:gateway:prod
+### Variables de Entorno Requeridas
 
-# Verificar código con ESLint
-nx run openapi-tools:lint
-```
+- **URLs de servicios**: Debes tener una variable por cada API que quieras exponer, siguiendo el patrón `{NOMBRE_API}_BACKEND_URL`.
+  ```bash
+  # .env.dev
+  USERS_BACKEND_URL=https://api-users-dev.example.com
+  ORDERS_DETAIL_BACKEND_URL=https://api-orders-detail-dev.example.com
+  ```
+- **`GCP_PROJECT_ID`**: ID del proyecto de Google Cloud.
+- **`GATEWAY_API_NAME`**: Nombre base para el API en Google Cloud (ej: `mi-empresa-api`).
+- **`GATEWAY_TITLE`**: Título para la especificación OpenAPI.
+- **`ENVIRONMENT`**: Entorno actual (`dev` o `prod`).
 
-### Uso directo con pnpm scripts:
+### Variables Opcionales
 
-```bash
-# Generar especificación OpenAPI
-pnpm openapi:generate:dev        # Para desarrollo
-pnpm openapi:generate:prod       # Para producción
+- `OPENAPI_OUTPUT_FILE`: Nombre del archivo de salida (default: `openapi-gateway.yaml`).
+- `BACKEND_PROTOCOL`: Protocolo hacia el backend (default: `https`).
 
-# Desplegar configuración a Google Cloud
-pnpm gateway:deploy:dev          # Desarrollo
-pnpm gateway:deploy:prod         # Producción
+## 🛠️ Cómo Funciona el Análisis
 
-# Crear gateway completo (incluye generación y deploy)
-pnpm gateway:create:dev          # Desarrollo
-pnpm gateway:create:prod         # Producción
+### Auto-Discovery
 
-# Flujo completo (generar + desplegar + crear gateway)
-pnpm gateway:dev                 # Desarrollo
-pnpm gateway:prod                # Producción
-```
+Para que un servicio sea descubierto automáticamente, debe cumplir dos condiciones:
 
-## Troubleshooting
+1.  **Tener el Tag correcto**: El `project.json` de la app debe incluir `"tags": ["scope:gcp-gateway"]`.
+2.  **Tener una URL definida**: Debe existir una variable de entorno `{NOMBRE_API}_BACKEND_URL` en el archivo `.env` correspondiente.
 
-### No se encuentran controladores
+### Análisis de DTOs (La Clave del Sistema)
 
-**Problema**: El sistema reporta "0 controladores encontrados" para una librería.
+El `controller-analyzer.ts` es el núcleo de la generación de schemas.
 
-**Soluciones:**
+- **`generateSchemaForType`**: Esta función recursiva recibe un tipo (`ts.Type`) del `TypeChecker` de TypeScript.
+- **Inspección de Propiedades**: Itera sobre las propiedades de una clase DTO.
+- **Manejo de Tipos**: Determina si cada propiedad es `string`, `number`, un array, u otro DTO anidado.
+- **Generación de `$ref`**: El resultado es un conjunto de `definitions` y referencias (`$ref`) a ellas, lo que mantiene la especificación limpia y reutilizable.
 
-1. Verificar que los archivos terminen en `.controller.ts`
-2. Verificar que exista el directorio `src/lib/controllers/`
-3. Verificar que los controladores tengan el decorador `@Controller()`
-
-### Rutas no aparecen en el OpenAPI generado
-
-**Problema**: Los controladores se detectan pero las rutas no aparecen.
-
-**Soluciones:**
-
-1. Verificar que los métodos tengan decoradores HTTP (`@Get`, `@Post`, etc.)
-2. Verificar que la sintaxis de TypeScript sea correcta
-3. Revisar los logs del generador para errores de parsing
-
-### Variables de entorno no se detectan
-
-**Problema**: El servicio no se incluye en la generación.
-
-**Soluciones:**
-
-1. Verificar que la variable siga el patrón `{NOMBRE}_BACKEND_URL`
-2. Verificar que exista una aplicación `apps/api-{nombre}/`
-3. Verificar que la variable esté definida en el archivo `.env.{environment}`
-
-### Ejemplo de debug
-
-```bash
-# Ejecutar con logs detallados
-DEBUG=* npm run openapi:generate:dev
-
-# Verificar variables de entorno
-echo $USERS_BACKEND_URL
-echo $ORDERS_BACKEND_URL
-
-# Verificar estructura del proyecto
-ls -la apps/api-*/
-ls -la libs/*-domain/src/lib/controllers/
-```
-
-## Configuración
-
-### Variables de entorno requeridas:
-
-**URLs de servicios (automáticamente descubiertas):**
-
-- `USERS_BACKEND_URL`: URL del servicio de usuarios
-- `ORDERS_BACKEND_URL`: URL del servicio de órdenes
-- `{SERVICE}_BACKEND_URL`: Patrón para cualquier nuevo servicio
-
-**Configuración de Google Cloud:**
-
-- `GCP_PROJECT_ID`: ID del proyecto de Google Cloud para deployment
-- `GATEWAY_API_NAME`: Nombre de la API en Google Cloud API Gateway (ej: mi-api-gateway)
-
-**Configuración opcional:**
-
-- `OPENAPI_OUTPUT_FILE`: Archivo de salida personalizado
-- `GATEWAY_TITLE`: Título del gateway personalizado
-- `GATEWAY_DESCRIPTION`: Descripción del gateway personalizada
-- `GATEWAY_VERSION`: Versión del gateway personalizada
-- `BACKEND_PROTOCOL`: Protocolo de backend (http/https)
-- `RATE_LIMIT_PER_MINUTE`: Límite de requests por minuto (default: 10000, rango: 1-1000000)
-
-### Archivos de configuración:
-
-Utiliza archivos `.env.{environment}` en la raíz del workspace:
-
-```bash
-# .env.dev
-ENVIRONMENT=dev
-USERS_BACKEND_URL=https://api-users-dev.example.com
-ORDERS_DETAIL_BACKEND_URL=https://api-orders-detail-dev.example.com
-GATEWAY_API_NAME=mi-api-dev
-# ... resto de variables
-```
-
-## Auto-Discovery de Servicios
-
-### Sistema Basado en Nx Workspace
-
-El sistema utiliza la configuración del workspace Nx para descubrir automáticamente servicios y sus controladores:
-
-**Para añadir un nuevo servicio:**
-
-1. **Crear app NestJS**: `nx generate @nx/nest:app api-nuevo-servicio`
-2. **Crear librería de dominio**: `nx generate @nx/nest:lib nuevo-servicio-domain`
-3. **Añadir controladores** en `libs/nuevo-servicio-domain/src/lib/controllers/`
-4. **Añadir variable de entorno**: `NUEVO_SERVICIO_BACKEND_URL=https://...` en `.env.dev`
-5. **Ejecutar**: `npm run gateway:dev`
-
-### Detección Automática
-
-**Descubrimiento de servicios:**
-
-- Busca aplicaciones que empiecen con `api-*` en el workspace Nx
-- **Ignora automáticamente** aplicaciones de test que terminan en `-e2e`
-- Busca variables de entorno `*_BACKEND_URL` correspondientes
-- Mapea automáticamente URLs a servicios descubiertos
-
-**Análisis de controladores:**
-
-- Escanea todas las librerías que contengan `domain` o empiecen con `core-*`
-- Analiza archivos `*.controller.ts`
-- Extrae rutas usando análisis estático del AST de TypeScript
-- Detecta decoradores `@Controller`, `@Get`, `@Post`, `@Put`, `@Delete`, `@Patch`
-- Extrae información de Swagger: `@ApiTags`, `@ApiOperation`, `@ApiResponse`
-
-### Estructura Recomendada
-
-```
-apps/
-├── api-users/                    # Aplicación NestJS
-│   └── src/app/app.module.ts    # Importa UsersDomainModule
-└── api-orders/                   # Aplicación NestJS
-    └── src/app/app.module.ts    # Importa OrdersDomainModule
-
-libs/
-├── users-domain/                 # Librería de dominio
-│   └── src/lib/controllers/
-│       ├── users.controller.ts   # Controlador de usuarios
-│       └── auth.controller.ts    # Controlador de autenticación
-└── orders-domain/                # Librería de dominio
-    └── src/lib/controllers/
-        └── orders.controller.ts # Controlador de órdenes
-```
-
-**Requisitos:**
-
-- Variable `*_BACKEND_URL` para cada servicio
-- Aplicación en `apps/api-{nombre}/`
-- Controladores en librerías `*-domain` o `core-*`
-
-## Análisis Estático de Controladores
-
-### Decoradores Soportados
-
-El analizador estático detecta y procesa los siguientes decoradores de NestJS:
-
-**Controladores:**
-
-- `@Controller(path)` - Define el path base del controlador
-- `@ApiTags(tag)` - Define el tag para agrupación en Swagger
-
-**Rutas HTTP:**
-
-- `@Get(path?)`, `@Post(path?)`, `@Put(path?)`, `@Delete(path?)`, `@Patch(path?)`
-- Extrae parámetros de path (`:id`, `:userId`) automáticamente
-
-**Documentación Swagger:**
-
-- `@ApiOperation({ summary })` - Descripción de la operación
-- `@ApiResponse({ status, description })` - Respuestas esperadas
-
-**Parámetros:**
-
-- `@Param()` - Parámetros de path
-- `@Body()` - Cuerpo de request (para POST, PUT, PATCH)
-- `@Query()` - Parámetros de query
-
-### Ejemplo de Controlador
+Para que esto funcione, es **fundamental** que especifiques el tipo de tus DTOs en los decoradores:
 
 ```typescript
-@ApiTags('users')
-@Controller('users')
-export class UsersController {
-  @Post()
-  @ApiOperation({ summary: 'Create user' })
-  @ApiResponse({ status: 201, description: 'User created' })
-  async create(@Body() dto: CreateUserDto): Promise<UserEntity> {
-    // Genera: POST /users
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'Get user by ID' })
-  @ApiResponse({ status: 200, description: 'User found' })
-  async findOne(@Param('id') id: string): Promise<UserEntity> {
-    // Genera: GET /users/{id}
-  }
+@Post()
+@ApiResponse({ 
+  status: 201, 
+  type: CreateItemDto // <-- ¡CRÍTICO para el schema de respuesta!
+})
+async create(@Body() dto: CreateItemDto) { // <-- CRÍTICO para el schema de petición
+  // ...
 }
 ```
 
-### Resultado del Análisis
+## 🐛 Troubleshooting
 
-Para cada controlador, el sistema extrae:
+#### **Mi API no aparece en el `openapi.yaml` generado.**
 
-- **Path base** del controlador
-- **Rutas individuales** con método HTTP
-- **Parámetros** de path, query y body
-- **Documentación** de Swagger
-- **Respuestas** esperadas con códigos de estado
+1.  **Verifica el Tag**: ¿Has añadido `"tags": ["scope:gcp-gateway"]` al `project.json` de tu API?
+2.  **Verifica la URL**: ¿Has definido la variable `*_BACKEND_URL` correspondiente en tu archivo `.env`?
 
-## Ventajas del Sistema Actual
+#### **El `body` de mi petición o la respuesta aparece como un objeto vacío `{}`.**
 
-### ✅ Análisis Estático vs Carga Dinámica
+1.  **Verifica el `@Body()`**: ¿Tu método del controlador tiene un parámetro decorado con `@Body()` y su tipo es una clase DTO (ej. `@Body() dto: MiDto`)?
+2.  **Verifica el `@ApiResponse()`**: ¿Has añadido la propiedad `type: MiDtoDeRespuesta` al decorador `@ApiResponse`?
+3.  **Verifica la importación**: ¿El DTO está correctamente importado en el archivo del controlador?
 
-**Beneficios:**
+#### **Error: "No se encontraron servicios API configurados"**
 
-- **Sin dependencias de runtime**: No requiere cargar módulos NestJS dinámicamente
-- **Independiente del entorno**: Funciona sin importar la configuración de la aplicación
-- **Más rápido**: No necesita compilar ni ejecutar código de la aplicación
-- **Más seguro**: No ejecuta código potencialmente problemático
-- **Mejor mantenibilidad**: Sin dependencias de paths hardcodeados
-
-### ✅ Integración con Nx
-
-**Beneficios:**
-
-- **Auto-discovery inteligente**: Utiliza la configuración existente del workspace
-- **Detección automática de dependencias**: Encuentra librerías de dominio automáticamente
-- **Consistencia**: Sigue las convenciones establecidas de Nx
-- **Zero configuration**: Funciona sin configuración adicional si sigues las convenciones
-
-### ✅ Arquitectura Limpia
-
-**Beneficios:**
-
-- **Separación de responsabilidades**: Controladores en librerías de dominio
-- **Reutilización**: Las librerías pueden ser compartidas entre aplicaciones
-- **Testabilidad**: Cada componente es independiente y testeable
-- **Escalabilidad**: Fácil agregar nuevos servicios siguiendo el patrón
-
-## Deployment a Google Cloud
-
-### Configuración inicial (una sola vez):
-
-```bash
-npm run gcp:setup
-```
-
-### Deployment completo:
-
-#### Para desarrollo:
-
-```bash
-npm run gateway:dev
-```
-
-#### Para producción:
-
-```bash
-npm run gateway:prod
-```
-
-### Ejemplo de configuración:
-
-```bash
-export USERS_BACKEND_URL=https://users-api.example.com
-export ORDERS_BACKEND_URL=https://orders-api.example.com
-export GCP_PROJECT_ID=mi-proyecto-id
-export GATEWAY_API_NAME=mi-empresa-api
-export GATEWAY_TITLE="Mi API Gateway"
-export BACKEND_PROTOCOL=https
-```
-
-### Comandos granulares (para debugging):
-
-```bash
-# Solo generar especificación
-nx run openapi-tools:generate:dev     # Desarrollo
-nx run openapi-tools:generate:prod    # Producción
-
-# Solo desplegar configuración
-nx run openapi-tools:deploy:dev       # Desarrollo
-nx run openapi-tools:deploy:prod      # Producción
-
-# Solo crear gateway (requiere deploy previo)
-nx run openapi-tools:gateway:dev      # Desarrollo
-nx run openapi-tools:gateway:prod     # Producción
-```
+- **Solución**: Revisa que las variables `*_BACKEND_URL` estén definidas en el archivo `.env` correcto y que los nombres coincidan con los proyectos `api-*`.

@@ -4,68 +4,137 @@ Esta documentación describe el sistema completo de generación y gestión de AP
 
 ## 📋 Tabla de Contenidos
 
+- [✨ Características Principales](#-características-principales)
 - [🏗️ Arquitectura](#️-arquitectura)
-- [⚙️ Configuración](#️-configuración)
+- [⚙️ Configuración y Uso](#️-configuración-y-uso)
 - [🚀 Uso Rápido](#-uso-rápido)
 - [📝 Comandos Disponibles](#-comandos-disponibles)
-- [🔧 Scripts Internos](#-scripts-internos)
 - [🌍 Variables de Entorno](#-variables-de-entorno)
 - [🐛 Troubleshooting](#-troubleshooting)
+- [🎯 Mejores Prácticas](#-mejores-prácticas)
+- [🔗 Enlaces Útiles](#-enlaces-útiles)
+- [🆘 Soporte](#-soporte)
+
+---
+
+## ✨ Características Principales
+
+- ✅ **Descubrimiento por Tags**: Detecta automáticamente las APIs marcadas con el tag `scope:gcp-gateway` en su `project.json`.
+- ✅ **Análisis Estático Inteligente**: Usa el compilador de TypeScript para analizar el código fuente de los controladores y DTOs sin necesidad de ejecutar la aplicación.
+- ✅ **Generación Automática de Schemas**: Crea automáticamente los `schemas` (modelos de datos) a partir de los DTOs que usas en los decoradores `@Body()` y `@ApiResponse()`.
+- ✅ **Conversión a Swagger 2.0**: Convierte la especificación final al formato compatible con Google Cloud API Gateway.
+- ✅ **Optimización para Google Cloud**: Añade automáticamente la configuración de backends, seguridad (`x-api-key`) y cuotas.
 
 ---
 
 ## 🏗️ Arquitectura
 
-El sistema está compuesto por tres componentes principales:
+El sistema analiza tu código fuente para generar una especificación OpenAPI que Google Cloud puede entender.
 
 ```mermaid
 graph LR
-    A[APIs NestJS] --> B[OpenAPI Generator]
-    B --> C[Google Cloud Config]
-    C --> D[API Gateway]
-    D --> E[URL Pública]
+    A[APIs NestJS con DTOs] -- Análisis Estático --> B[OpenAPI Generator]
+    B -- genera --> C[openapi.yaml]
+    C -- se despliega en --> D[Google Cloud API Gateway]
+    D -- gestiona el tráfico hacia --> A
 ```
 
-### **Flujo de trabajo:**
+**Flujo de trabajo:**
 
-1. **📊 Análisis Estático**: Analiza archivos de controladores TypeScript sin cargar módulos dinámicamente
-2. **🔍 Auto-Discovery**: Utiliza la configuración del workspace Nx para descubrir servicios automáticamente
-3. **📝 Extracción**: Extrae rutas, parámetros y documentación Swagger de los controladores
-4. **🔄 Conversión**: Convierte OpenAPI 3.0 → Swagger 2.0 (requerido por Google Cloud)
-5. **☁️ Optimización**: Añade configuraciones específicas de Google Cloud
-6. **🚀 Deploy**: Crea configuración en Google Cloud API Gateway
-7. **🌐 Gateway**: Crea puerta de enlace pública con URL accesible
+1.  **🔍 Descubrimiento**: El script busca en tu workspace de Nx todos los proyectos que tengan el tag `scope:gcp-gateway`.
+2.  **📝 Análisis y Extracción**: Para cada API encontrada, analiza estáticamente los controladores (`*.controller.ts`). Extrae rutas, métodos, parámetros y, lo más importante, los **tipos de los DTOs** usados en `@Body()` y `@ApiResponse()`.
+3.  **🏗️ Generación de Schemas**: Convierte cada DTO en un `schema` de OpenAPI, describiendo sus propiedades y si son requeridas.
+4.  **🔄 Ensamblaje y Conversión**: Combina toda la información en una única especificación OpenAPI 3.0 y luego la convierte a Swagger 2.0.
+5.  **☁️ Optimización y Despliegue**: Añade las extensiones de Google Cloud y despliega la configuración en el API Gateway.
 
 ---
 
-## ⚙️ Configuración
+## ⚙️ Configuración y Uso
 
-### **1. Variables de Entorno**
+Para que una API sea descubierta y documentada correctamente, debes seguir estos pasos:
 
-Crea los archivos de entorno basándote en los ejemplos:
+### **Paso 1: Configuración Inicial de Google Cloud (Solo una vez)**
 
-```bash
-# Para desarrollo
-cp .env.development.example .env.dev
-
-# Para producción
-cp .env.production.example .env.prod
-```
-
-### **2. Configuración de Google Cloud**
-
-Ejecuta el setup inicial una sola vez:
+Ejecuta el setup inicial una sola vez por proyecto de Google Cloud:
 
 ```bash
 npm run gcp:setup
 ```
 
 Este comando:
+- ✅ Habilita las APIs de Google Cloud necesarias.
+- ✅ Crea una cuenta de servicio con los permisos adecuados.
+- ✅ Prepara la base para el API Gateway.
 
-- ✅ Habilita APIs necesarias
-- ✅ Crea cuenta de servicio
-- ✅ Configura permisos
-- ✅ Prepara API Gateway base
+### **Paso 2: Marcar la API con un Tag**
+
+En el archivo `project.json` de la API que quieres exponer, añade el tag `scope:gcp-gateway`.
+
+**Ejemplo: `apps/api-users/project.json`**
+
+```json
+{
+  "name": "api-users",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  // ...
+  "tags": ["scope:gcp-gateway"], // <-- ¡AÑADE ESTA LÍNEA!
+  "targets": {
+    // ...
+  }
+}
+```
+
+### **Paso 3: Definir la URL del Backend**
+
+Define la URL del backend para cada API en tu archivo de entorno (`.env.dev` o `.env.prod`). El sistema asocia la variable con el proyecto `api-*` correspondiente.
+
+```bash
+# .env.dev
+
+# La variable USERS_BACKEND_URL se asocia al proyecto `api-users`
+USERS_BACKEND_URL=https://api-users-xxx.run.app/api
+
+# La variable ORDERS_DETAIL_BACKEND_URL se asocia a `api-orders-detail`
+ORDERS_DETAIL_BACKEND_URL=https://api-orders-detail-xxx.run.app/api
+```
+
+### **Paso 4: Documentar con Decoradores (¡Crucial!)**
+
+Para que la generación de schemas funcione, **debes** usar los decoradores `@Body()` y `@ApiResponse()` en tus controladores, especificando el tipo del DTO.
+
+**Ejemplo de controlador:**
+
+```typescript
+// En algun-lugar.dto.ts
+export class CreateItemDto {
+  @IsString()
+  name: string;
+
+  @IsInt()
+  @IsOptional()
+  quantity?: number;
+}
+
+// En tu-api.controller.ts
+import { CreateItemDto } from './algun-lugar.dto';
+
+@ApiTags('items')
+@Controller('items')
+export class ItemsController {
+
+  @Post()
+  @ApiOperation({ summary: 'Crear un nuevo item' })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'El item ha sido creado exitosamente.',
+    type: CreateItemDto // <-- ¡IMPORTANTE! Especifica el DTO de respuesta
+  })
+  async create(@Body() dto: CreateItemDto): Promise<any> {
+    // El tipo del parámetro `dto` (CreateItemDto) se usará para el schema del Request Body.
+    // El tipo en `@ApiResponse` se usará para el schema de la respuesta.
+  }
+}
+```
 
 ---
 
@@ -121,70 +190,15 @@ npm run gateway:prod
 | `npm run gateway:deploy:dev`   | Solo crear config en GCP      | Probar validación de Google  |
 | `npm run gateway:create:dev`   | Solo crear/actualizar gateway | Cambiar config sin regenerar |
 
-### **Comandos de Gestión**
-
-| Comando                                    | Descripción                           |
-| ------------------------------------------ | ------------------------------------- |
-| `npm run gcp:setup`                        | Configuración inicial de Google Cloud |
-| `bash tools/scripts/create-gateway.sh dev` | Gestión directa de gateway            |
-
----
-
-## 🔧 Scripts Internos
-
-### **1. Generador OpenAPI (`generate-openapi.ts`)**
-
-**Ubicación:** `tools/scripts/generate-openapi.ts`
-
-**Funcionalidades:**
-
-- 🔍 **Auto-discovery**: Detecta proyectos automáticamente usando configuración del workspace Nx
-- � **Análisis estático**: Analiza archivos de controladores TypeScript usando AST
-- 🏗️ **Extracción real**: Genera specs desde código real sin carga dinámica de módulos
-- 🔄 **Conversión**: OpenAPI 3.0 → Swagger 2.0 con `api-spec-converter`
-- ☁️ **Optimización GCP**: Añade configuraciones específicas de Google Cloud
-
-**Ejemplo de ejecución:**
-
-```bash
-node tools/scripts/generate-openapi.ts --output ${OPENAPI_OUTPUT_FILE} --protocol http
-```
-
-### **2. Gestor de Gateway (`create-gateway.sh`)**
-
-**Ubicación:** `tools/scripts/create-gateway.sh`
-
-**Funcionalidades:**
-
-- 🔍 **Auto-detección**: Encuentra la configuración más reciente
-- 🔄 **Gestión inteligente**: Crea o actualiza gateway según sea necesario
-- 📊 **Feedback completo**: Muestra URL final y comandos de prueba
-- 🌍 **Multi-entorno**: Soporte para dev/prod
-
-**Ejemplo de ejecución:**
-
-```bash
-bash tools/scripts/create-gateway.sh dev
-```
-
-### **3. Sistema de Auto-Discovery**
-
-**Ubicación:** `tools/openapi/src/services/nx-workspace-discovery.ts`
-
-**Funcionalidades:**
-
-- 📁 **Análisis del workspace**: Utiliza configuración de Nx para descubrir proyectos automáticamente
-- 🔍 **Detección inteligente**: Encuentra proyectos API basándose en patrones de nombres y estructura
-- 📊 **Análisis de controladores**: Integra con sistema de análisis estático para extraer rutas
-- 🏗️ **Flexibilidad**: Soporta múltiples patrones de nombres de archivos (.controller.ts)
-
 ---
 
 ## 🌍 Variables de Entorno
 
+Crea los archivos de entorno basándote en los ejemplos: `cp .env.development.example .env.dev`.
+
 ### **Variables Requeridas**
 
-Todas las siguientes variables son **obligatorias** y deben estar definidas:
+Todas las siguientes variables son **obligatorias**:
 
 ```bash
 # URLs de tus APIs (patrón: *_BACKEND_URL)
@@ -204,101 +218,26 @@ ENVIRONMENT=dev                           # dev o prod
 GCP_PROJECT_ID=mi-proyecto-123         # ID del proyecto en Google Cloud
 ```
 
-### **⚠️ Detalles de las variables de Google Cloud**
-
-#### **`GCP_PROJECT_ID` (OBLIGATORIO)**
-
-- ✅ **Para qué**: Deployment en Google Cloud API Gateway
-- ❌ **Sin él**: El script falla inmediatamente con error claro
-- 🎯 **Uso**: SIEMPRE requerido, no funciona sin él
-- 🔒 **Validación**: Se valida al inicio del script
-
-### **🔐 Método de autenticación:**
-
-```bash
-✅ x-api-key (header) - API Key en header (estándar de Google Cloud)
-```
-
-### **💡 Uso con API Key:**
-
-```bash
-# API Key en header (método seguro recomendado por Google)
-curl -H "x-api-key: TU_API_KEY" https://gateway.com/users
-curl -H "x-api-key: TU_API_KEY" https://gateway.com/orders
-```
-
-### **Auto-discovery de Servicios**
-
-El sistema detecta automáticamente nuevos servicios siguiendo el patrón:
-
-```bash
-# Para agregar una nueva API, solo necesitas:
-PAYMENTS_BACKEND_URL=https://api-payments-xxx.run.app/api
-# ↓ Se detecta automáticamente como "payments" API
-```
-
-**Requisitos para auto-discovery:**
-
-1. Variable termine en `_BACKEND_URL`
-2. Proyecto exista en la configuración del workspace Nx
-3. Archivos de controladores existan con patrones `.controller.ts`
-4. Estructura de proyecto siga convenciones de Nx monorepo
-
 ---
 
 ## 🐛 Troubleshooting
 
-### **Errores Comunes**
+#### **Mi API no aparece en el `openapi.yaml` generado.**
 
-#### **1. "No se encontraron servicios API configurados"**
+1.  **Verifica el Tag**: ¿Has añadido `"tags": ["scope:gcp-gateway"]` al `project.json` de tu API?
+2.  **Verifica la URL**: ¿Has definido la variable `*_BACKEND_URL` correspondiente en tu archivo `.env`?
 
-```bash
-❌ No se encontraron servicios API configurados.
-```
+#### **El `body` de mi petición o la respuesta aparece como un objeto vacío `{}`.**
 
-**Solución:**
+1.  **Verifica el `@Body()`**: ¿Tu método del controlador tiene un parámetro decorado con `@Body()` y su tipo es una clase DTO (ej. `@Body() dto: MiDto`)?
+2.  **Verifica el `@ApiResponse()`**: ¿Has añadido la propiedad `type: MiDtoDeRespuesta` al decorador `@ApiResponse`?
+3.  **Verifica la importación**: ¿El DTO está correctamente importado en el archivo del controlador?
 
-- Verifica que las variables `*_BACKEND_URL` estén definidas
-- Confirma que las apps existan en `apps/api-*`
-- Revisa el archivo `.env.dev` o `.env.prod`
+#### **Error: "Location ... is not found or access is unauthorized"**
 
-#### **2. "Error analizando controladores"**
+- API Gateway no está disponible en todas las regiones. El script usa `us-central1` por defecto, que es una región válida.
 
-```bash
-❌ Error analizando controladores para users
-```
-
-**Solución:**
-
-- Verifica que los archivos de controladores existan con extensión `.controller.ts`
-- Confirma que la sintaxis TypeScript sea válida
-- Revisa que los decoradores de NestJS estén correctamente importados
-- El proyecto debe estar en la configuración del workspace Nx
-
-#### **3. "Protocol field must be 'http/1.1' or 'h2'"**
-
-```bash
-❌ Protocol field in extension x-google-backend must be 'http/1.1' or 'h2'
-```
-
-**Solución:**
-
-- El script ahora convierte automáticamente `http` → `http/1.1` y `https` → `h2`
-- Si persiste, verifica que `BACKEND_PROTOCOL` esté configurado correctamente
-
-#### **4. "Location southamerica-west1 is not found"**
-
-```bash
-❌ Location southamerica-west1 is not found or access is unauthorized
-```
-
-**Solución:**
-
-- API Gateway no está disponible en todas las regiones
-- El script usa `us-central1` automáticamente
-- No necesitas cambiar nada, es comportamiento esperado
-
-### **Comandos de Diagnóstico**
+### **Comandos de Diagnóstico de `gcloud`**
 
 ```bash
 # Ver configuraciones existentes
@@ -311,51 +250,19 @@ gcloud api-gateway gateways list --location=us-central1
 gcloud logging read "resource.type=api_gateway" --limit=50
 ```
 
-### **Validación Manual**
+### **Validación Manual del Spec**
 
-Si quieres validar el spec manualmente:
-
-```bash
-# Generar el spec
-npm run openapi:generate:dev
-
-# Validar en Swagger Editor online
-# Copia el contenido del archivo especificado en OPENAPI_OUTPUT_FILE
-# Pégalo en: https://editor.swagger.io/
-```
+1.  Ejecuta `npm run openapi:generate:dev`.
+2.  Abre el archivo `openapi-gateway.yaml`.
+3.  Copia su contenido y pégalo en [Swagger Editor](https://editor.swagger.io/) para visualizarlo y validarlo.
 
 ---
 
 ## 🎯 Mejores Prácticas
 
-### **1. Flujo de Desarrollo**
-
-```bash
-# 1. Desarrollar API localmente
-npm run serve:api-users
-
-# 2. Desplegar API a Cloud Run
-npm run docker:api-users
-
-# 3. Actualizar variable de entorno
-# USERS_BACKEND_URL=https://nueva-url.run.app/api
-
-# 4. Regenerar gateway
-npm run gateway:dev
-```
-
-### **2. Gestión de Entornos**
-
-- Usa `.env.dev` para desarrollo
-- Usa `.env.prod` para producción
-- Nunca committees archivos `.env.*` con datos reales
-- Mantén `.env.*.example` actualizados
-
-### **3. Monitoreo**
-
-- Usa Google Cloud Console para ver métricas
-- Configura alertas en API Gateway
-- Revisa logs regularmente
+- **Flujo de Desarrollo**: Desarrolla tu API, despliégala a Cloud Run, actualiza la URL en el `.env` y finalmente regenera el gateway con `npm run gateway:dev`.
+- **Gestión de Entornos**: Usa `.env.dev` para desarrollo y `.env.prod` para producción. Nunca subas a git archivos `.env` con datos reales.
+- **Monitoreo**: Usa Google Cloud Console para ver métricas y configurar alertas en el API Gateway.
 
 ---
 
@@ -363,24 +270,14 @@ npm run gateway:dev
 
 - [Google Cloud API Gateway Docs](https://cloud.google.com/api-gateway/docs)
 - [OpenAPI 3.0 Specification](https://swagger.io/specification/)
-- [Swagger 2.0 Specification](https://swagger.io/specification/v2/)
 - [NestJS Swagger Module](https://docs.nestjs.com/openapi/introduction)
 
 ---
 
 ## 🆘 Soporte
 
-Si encuentras problemas:
-
-1. **Revisa los logs** del comando que falló
-2. **Consulta troubleshooting** arriba
-3. **Verifica configuración** de variables de entorno
-4. **Ejecuta diagnósticos** con comandos gcloud
-
-¿Necesitas agregar una nueva API? ¡Es muy fácil!
-
-1. Crea tu app: `nx generate @nx/nest:app api-nueva`
-2. Añade variable: `NUEVA_BACKEND_URL=https://...`
-3. Regenera: `npm run gateway:dev`
-
-¡Y listo! El auto-discovery se encarga del resto. 🚀
+Si encuentras problemas, sigue estos pasos:
+1. Revisa los logs del comando que falló.
+2. Consulta la sección de `Troubleshooting` de este documento.
+3. Verifica tu configuración de variables de entorno.
+4. Ejecuta los comandos de diagnóstico de `gcloud`.

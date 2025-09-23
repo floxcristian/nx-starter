@@ -6,29 +6,6 @@
  */
 
 /**
- * Representa un módulo de servicio NestJS que puede ser instanciado
- * para la generación de documentación OpenAPI.
- */
-
-/**
- * Error que puede ocurrir durante la conversión de OpenAPI 3.0 a Swagger 2.0
- */
-export interface ConversionError {
-  /** Mensaje descriptivo del error */
-  message?: string;
-}
-
-/**
- * Resultado de la conversión de especificación OpenAPI
- */
-export interface ConversionResult {
-  /** Especificación resultante en formato Swagger 2.0 */
-  spec: SwaggerV2Document;
-  /** Lista de errores o advertencias durante la conversión */
-  errors?: ConversionError[];
-}
-
-/**
  * Documento OpenAPI en formato Swagger 2.0 compatible con Google Cloud API Gateway
  */
 export interface SwaggerV2Document {
@@ -76,7 +53,7 @@ export interface SecurityDefinition {
 }
 
 /**
- * Configuración de un servicio API individual
+ * Configuración de un servicio API individual, descubierto por el analizador de Nx.
  */
 export interface ServiceConfig {
   /** Nombre identificador del servicio */
@@ -90,7 +67,7 @@ export interface ServiceConfig {
 }
 
 /**
- * Configuración principal del generador OpenAPI
+ * Configuración principal del generador OpenAPI, obtenida de variables de entorno.
  */
 export interface Config {
   /** Nombre del archivo de salida */
@@ -136,17 +113,4 @@ export const CONSTANTS = {
     /** Protocolo HTTP/2 para Google Cloud */
     PROTOCOL_H2: 'h2',
   } as const,
-} as const;
-
-/**
- * Utilidades para manipulación de strings
- */
-export const StringUtils = {
-  /**
-   * Capitaliza la primera letra de una cadena
-   * @param str - Cadena a capitalizar
-   * @returns Cadena con la primera letra en mayúscula
-   */
-  capitalize: (str: string): string =>
-    str.charAt(0).toUpperCase() + str.slice(1),
 } as const;

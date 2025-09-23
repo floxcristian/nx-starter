@@ -1,8 +1,8 @@
 /**
- * @fileoverview Punto de entrada principal del generador OpenAPI modular
+ * @fileoverview Punto de entrada principal del generador OpenAPI modular.
  *
- * Este archivo orquesta todo el proceso de generación utilizando
- * la arquitectura modular organizada.
+ * Este archivo orquesta todo el proceso de generación de la especificación
+ * OpenAPI para el API Gateway, coordinando los diferentes servicios modulares.
  */
 
 import { buildConfig } from './validators/config-validator';
@@ -21,33 +21,31 @@ import {
 } from './utils/console-logger';
 
 /**
- * Función principal que ejecuta todo el proceso de generación de OpenAPI
+ * Función principal que ejecuta todo el proceso de generación de OpenAPI.
  */
 async function main(): Promise<void> {
   try {
-    // 1. Obtener configuración (incluye validación completa)
+    // 1. Obtener y validar la configuración desde variables de entorno.
     console.log('🔧 Iniciando generador OpenAPI...');
     const config = buildConfig();
 
-    // 2. Descubrir servicios disponibles usando Nx
+    // 2. Descubrir servicios disponibles y sus URLs usando el grafo de Nx.
     const nxGenerator = new NxBasedOpenApiGenerator();
     const services = nxGenerator.generateServiceConfigs();
 
     if (services.length === 0) {
       throw new Error(
-        'No se encontraron servicios API configurados. Verifica tus variables de entorno *_BACKEND_URL'
+        "No se encontraron servicios API para el gateway. Revisa que los proyectos tengan el tag 'scope:gcp-gateway' y sus variables de entorno `*_BACKEND_URL` estén definidas."
       );
     }
 
     console.log(`📊 Servicios descubiertos: ${services.length}`);
-
-    // Mostrar configuración
     logConfiguration(config);
 
-    // 5. Generar documentos OpenAPI individuales usando el analizador estático
+    // 3. Generar un documento OpenAPI para cada servicio individualmente.
     const documents = await generateAllSwaggerDocuments(nxGenerator);
 
-    // 7. Combinar documentos en uno solo
+    // 4. Combinar todos los documentos en una única especificación OpenAPI 3.0.
     const combinedDocument = combineOpenAPIDocuments(
       documents,
       config.gatewayTitle,
@@ -55,20 +53,20 @@ async function main(): Promise<void> {
       config.gatewayVersion
     );
 
-    // 8. Convertir a Swagger 2.0 primero
+    // 5. Convertir la especificación combinada a Swagger 2.0 para Google Cloud.
     const swaggerDocument = await convertToSwagger2(combinedDocument);
 
-    // 9. Mejorar especificación para Google Cloud
+    // 6. Añadir extensiones específicas de Google Cloud (`x-google-*`).
     const enhancedSpec = enhanceSpecificationForGoogleCloud(
       swaggerDocument,
       config,
       services
     );
 
-    // 10. Escribir archivo final
+    // 7. Escribir el archivo final en disco.
     await writeSwaggerDocument(enhancedSpec, config.outputFile);
 
-    // Mostrar estadísticas finales
+    // 8. Mostrar resumen y próximos pasos.
     const pathCount = Object.keys(enhancedSpec.paths || {}).length;
     const definitionCount = Object.keys(enhancedSpec.definitions || {}).length;
     logSpecificationStats(config.outputFile, pathCount, definitionCount);
@@ -81,7 +79,7 @@ async function main(): Promise<void> {
   }
 }
 
-// Ejecutar si es llamado directamente
+// Ejecutar la función principal si el script es llamado directamente.
 if (require.main === module) {
   main().catch((error) => {
     console.error('❌ Error fatal:', error);
