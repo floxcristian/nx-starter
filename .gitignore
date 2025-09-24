@@ -51,4 +51,4 @@ Thumbs.db
 !.env*.example
 
 # OpenAPI generated files
-openapi-gateway*.yaml
+#openapi-gateway*.yaml

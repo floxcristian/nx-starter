@@ -1,0 +1,310 @@
+info:
+  title: Monorepo API Gateway (Development)
+  description: Gateway de desarrollo que unifica todos los microservicios.
+  version: 1.0.0-dev
+  x-google-management:
+    metrics:
+      - name: request_count
+        display_name: Request Count
+        value_type: INT64
+        metric_kind: DELTA
+      - name: request_latency
+        display_name: Request Latency
+        value_type: DISTRIBUTION
+        metric_kind: DELTA
+    quota:
+      limits:
+        - name: RequestsPerMinutePerProject
+          metric: request_count
+          unit: 1/min/{project}
+          values:
+            STANDARD: 10000
+  x-google-endpoints:
+    - name: monorepo-api-gateway-(development)-gateway
+      allowCors: true
+paths:
+  /orders/health:
+    get:
+      summary: Health check
+      operationId: healthCheck_api_orders_detail
+      responses:
+        "200":
+          description: Service is healthy
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: ok
+              service:
+                type: string
+                example: api-orders-detail
+      tags:
+        - health
+      parameters: []
+      x-google-backend:
+        address: https://api-orders-246335399285.southamerica-west1.run.app/api
+        protocol: http/1.1
+        path_translation: APPEND_PATH_TO_ADDRESS
+      security:
+        - x_api_key: []
+  /orders:
+    post:
+      summary: Create and process order
+      operationId: OrdersController_createOrder
+      tags:
+        - orders
+      responses:
+        "201":
+          description: Success
+          schema: &a5
+            type: object
+            properties:
+              order: &a2
+                type: object
+                properties:
+                  id:
+                    type: string
+                  userId:
+                    type: string
+                  amount:
+                    type: number
+                  currency:
+                    type: string
+                  description:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+                required:
+                  - id
+                  - userId
+                  - amount
+                  - currency
+                  - description
+                  - createdAt
+            required:
+              - order
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema: &a3
+            type: object
+            properties: {}
+      x-google-backend:
+        address: https://api-orders-246335399285.southamerica-west1.run.app/api
+        protocol: http/1.1
+        path_translation: APPEND_PATH_TO_ADDRESS
+      security:
+        - x_api_key: []
+    get:
+      summary: Get all orders
+      operationId: OrdersController_findAll
+      tags:
+        - orders
+      responses:
+        "200":
+          description: Success
+          schema:
+            type: array
+            items: &a1
+              type: object
+              properties: {}
+      parameters: []
+      x-google-backend:
+        address: https://api-orders-246335399285.southamerica-west1.run.app/api
+        protocol: http/1.1
+        path_translation: APPEND_PATH_TO_ADDRESS
+      security:
+        - x_api_key: []
+  /orders/user/{userId}:
+    get:
+      summary: Get orders by user ID
+      operationId: OrdersController_findByUserId
+      tags:
+        - orders
+      responses:
+        "200":
+          description: Success
+          schema:
+            type: array
+            items: *a1
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          type: string
+      x-google-backend:
+        address: https://api-orders-246335399285.southamerica-west1.run.app/api
+        protocol: http/1.1
+        path_translation: APPEND_PATH_TO_ADDRESS
+      security:
+        - x_api_key: []
+  /orders/{id}:
+    get:
+      summary: Get order by ID
+      operationId: OrdersController_findOne
+      tags:
+        - orders
+      responses:
+        "200":
+          description: Success
+          schema: *a2
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      x-google-backend:
+        address: https://api-orders-246335399285.southamerica-west1.run.app/api
+        protocol: http/1.1
+        path_translation: APPEND_PATH_TO_ADDRESS
+      security:
+        - x_api_key: []
+  /auth/login:
+    post:
+      summary: Login user
+      operationId: AuthController_login
+      tags:
+        - auth
+      responses:
+        "200":
+          description: Success
+          schema: &a6
+            type: object
+            properties:
+              accessToken:
+                type: string
+              user: &a4
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  email:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+                  password:
+                    type: string
+                required:
+                  - id
+                  - name
+                  - email
+                  - createdAt
+                  - password
+            required:
+              - accessToken
+              - user
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema: *a3
+  /users:
+    post:
+      summary: Create user
+      operationId: UsersController_create
+      tags:
+        - users
+      responses:
+        "201":
+          description: Success
+          schema: *a4
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema: *a3
+      x-google-backend:
+        address: https://api-users-246335399285.southamerica-west1.run.app/api
+        protocol: http/1.1
+        path_translation: APPEND_PATH_TO_ADDRESS
+      security:
+        - x_api_key: []
+    get:
+      summary: Get all users
+      operationId: UsersController_findAll
+      tags:
+        - users
+      responses:
+        "200":
+          description: Success
+          schema:
+            type: array
+            items: &a7
+              type: object
+              properties: {}
+      parameters: []
+      x-google-backend:
+        address: https://api-users-246335399285.southamerica-west1.run.app/api
+        protocol: http/1.1
+        path_translation: APPEND_PATH_TO_ADDRESS
+      security:
+        - x_api_key: []
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      operationId: UsersController_findOne
+      tags:
+        - users
+      responses:
+        "200":
+          description: Success
+          schema: *a4
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      x-google-backend:
+        address: https://api-users-246335399285.southamerica-west1.run.app/api
+        protocol: http/1.1
+        path_translation: APPEND_PATH_TO_ADDRESS
+      security:
+        - x_api_key: []
+  /users/health:
+    get:
+      summary: Health check
+      operationId: healthCheck_api_users
+      responses:
+        "200":
+          description: Service is healthy
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                example: ok
+              service:
+                type: string
+                example: api-users
+      tags:
+        - health
+      parameters: []
+      x-google-backend:
+        address: https://api-users-246335399285.southamerica-west1.run.app/api
+        protocol: http/1.1
+        path_translation: APPEND_PATH_TO_ADDRESS
+      security:
+        - x_api_key: []
+swagger: "2.0"
+definitions:
+  any: *a3
+  PaymentResponse: *a5
+  OrderEntity: *a2
+  typeof OrderEntity: *a1
+  AuthResponse: *a6
+  UserEntity: *a4
+  typeof UserEntity: *a7
+securityDefinitions:
+  x_api_key:
+    type: apiKey
+    name: x-api-key
+    in: header
+x-components: {}
+security:
+  - x_api_key: []

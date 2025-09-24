@@ -382,6 +382,32 @@ export class NxBasedOpenApiGenerator {
       Object.assign(allSchemas, controllerInfo.schemas);
     }
 
+    const cleanedSchemas: Record<string, SchemaObject | OpenAPIV3.ReferenceObject> = {};
+    const arrayMethods = new Set(['pop', 'push', 'slice', 'splice', 'shift', 'unshift', 'concat', 'join', 'reverse', 'sort', 'forEach', 'map', 'filter', 'reduce', 'reduceRight', 'every', 'some', 'indexOf', 'lastIndexOf', 'find', 'findIndex', 'fill', 'copyWithin', 'entries', 'keys', 'values', 'includes', 'flatMap', 'flat']);
+
+    for (const schemaName in allSchemas) {
+      const schema = allSchemas[schemaName];
+      const cleanedName = schemaName.replace(/^\\[typeof\\s(.+)\\]$/, '$1');
+
+      if (schema && 'required' in schema && Array.isArray(schema.required)) {
+        const properties = ('properties' in schema && typeof schema.properties === 'object' && schema.properties) ? Object.keys(schema.properties) : [];
+        
+        schema.required = schema.required.filter(prop => {
+          if (arrayMethods.has(prop) || prop.includes('@')) {
+            console.warn(`   ⚠️  Propiedad requerida '${prop}' en el schema '${cleanedName}' parece ser un método de Array o un símbolo y fue removida.`);
+            return false;
+          }
+
+          if (properties.length > 0 && !properties.includes(prop)) {
+             console.warn(`   ⚠️  Propiedad requerida '${prop}' en el schema '${cleanedName}' no existe en 'properties' y fue removida.`);
+             return false;
+          }
+          return true;
+        });
+      }
+      cleanedSchemas[cleanedName] = schema;
+    }
+
     const spec: OpenApiSpec = {
       openapi: '3.0.0',
       info: {
@@ -391,10 +417,11 @@ export class NxBasedOpenApiGenerator {
       },
       paths: this.buildPathsFromControllers(
         allControllers,
-        project.basePath || ''
+        project.basePath || '',
+        project.name
       ),
       components: {
-        schemas: allSchemas,
+        schemas: cleanedSchemas,
       },
       tags: this.extractTagsFromControllers(allControllers, project.name),
       dependencies: project.dependencies,
@@ -422,30 +449,36 @@ export class NxBasedOpenApiGenerator {
    */
   private buildPathsFromControllers(
     controllers: ControllerInfo[],
-    serviceBasePath: string
+    serviceBasePath: string,
+    projectName: string
   ): Record<string, Record<string, SwaggerOperation>> {
     const paths: Record<string, Record<string, SwaggerOperation>> = {};
+    const operationIds = new Set<string>();
 
-    const healthPath = `${serviceBasePath}/health`;
-    paths[healthPath] = {
-      get: {
-        summary: 'Health check',
-        operationId: 'healthCheck',
-        responses: {
-          '200': {
-            description: 'Service is healthy',
-            schema: {
-              type: 'object',
-              properties: {
-                status: { type: 'string', example: 'ok' },
-                service: { type: 'string' },
+    const healthOperationId = `healthCheck_${projectName.replace(/-/g, '_')}`;
+    if (!operationIds.has(healthOperationId)) {
+      const healthPath = `${serviceBasePath}/health`;
+      paths[healthPath] = {
+        get: {
+          summary: 'Health check',
+          operationId: healthOperationId,
+          responses: {
+            '200': {
+              description: 'Service is healthy',
+              schema: {
+                type: 'object',
+                properties: {
+                  status: { type: 'string', example: 'ok' },
+                  service: { type: 'string', example: projectName },
+                },
               },
             },
           },
+          tags: ['health'],
         },
-        tags: ['health'],
-      },
-    };
+      };
+      operationIds.add(healthOperationId);
+    }
 
     for (const controller of controllers) {
       for (const route of controller.routes) {
@@ -458,19 +491,28 @@ export class NxBasedOpenApiGenerator {
           paths[fullPath] = {};
         }
 
+        let operationId =
+          route.operationId ||
+          `${route.method}${route.path.replace(/[/{}:-]/g, '_')}`;
+
+        // Ensure operationId is unique within the spec
+        let counter = 1;
+        const originalOperationId = operationId;
+        while (operationIds.has(operationId)) {
+          operationId = `${originalOperationId}_${counter++}`;
+        }
+        operationIds.add(operationId);
+
         const operation: SwaggerOperation = {
           summary:
             route.summary || `${route.method.toUpperCase()} ${route.path}`,
-          operationId:
-            route.operationId ||
-            `${route.method}${route.path.replace(/[/{}:]/g, '_')}`,
+          operationId: operationId,
           tags: route.tags || ['default'],
           responses: {},
         };
 
         if (route.parameters && route.parameters.length > 0) {
           operation.parameters = route.parameters.map((param) => {
-            // Los parámetros 'body' anidan el schema.
             if (param.in === 'body') {
               return {
                 name: param.name,
@@ -481,31 +523,26 @@ export class NxBasedOpenApiGenerator {
               };
             }
 
-            // Los parámetros que no son 'body' (path, query) tienen las propiedades
-            // del schema al nivel superior (según la especificación Swagger 2.0).
             const { schema, ...baseParam } = param;
 
-            // Comprobamos si el schema es un objeto de referencia o un objeto de schema.
             if (schema && '$ref' in schema) {
-              // Swagger 2.0 no soporta $ref directamente en parámetros que no son 'body'.
-              // Se podría implementar una lógica para resolver la referencia, pero por ahora
-              // es más seguro omitirlo y registrar una advertencia.
               console.warn(
                 `ADVERTENCIA: $ref en el parámetro "${param.name}" (que no es 'body') no está soportado en la conversión a Swagger 2.0.`
               );
               return baseParam;
-            } else {
-              // Si es un SchemaObject, expandimos sus propiedades,
-              // pero excluimos su propiedad 'required' para evitar conflictos.
-              // Usamos desestructuración para separar 'required' del resto de las
-              // propiedades del schema. Nombramos la variable con '_' para indicar
-              // que es intencionadamente no utilizada, evitando errores del linter.
-              const { required: _schemaRequired, ...schemaProps } = schema;
-
+            } else if (schema) {
+              const schemaPropsForSpread: Record<string, unknown> = {};
+              for (const key in schema) {
+                if (Object.prototype.hasOwnProperty.call(schema, key) && key !== 'required') {
+                  schemaPropsForSpread[key] = schema[key as keyof typeof schema];
+                }
+              }
               return {
                 ...baseParam,
-                ...schemaProps,
+                ...schemaPropsForSpread,
               };
+            } else {
+              return baseParam;
             }
           });
         }

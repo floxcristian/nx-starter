@@ -134,9 +134,14 @@ export class ControllerAnalyzer {
     let tags: string[] = [];
     const routes: ControllerRoute[] = [];
     const schemas: Record<string, SchemaObject | OpenAPIV3.ReferenceObject> = {};
+    let controllerClassName = '';
 
     const visit = (node: ts.Node) => {
       if (ts.isClassDeclaration(node)) {
+        if (node.name && ts.isIdentifier(node.name)) {
+          controllerClassName = node.name.text;
+        }
+
         const decorators = ts.getDecorators(node);
         if (decorators) {
           const controllerDecorator = this.findDecorator(decorators, 'Controller');
@@ -159,7 +164,8 @@ export class ControllerAnalyzer {
                 member,
                 basePath,
                 typeChecker,
-                schemas
+                schemas,
+                controllerClassName
               );
               if (route) {
                 route.tags = tags;
@@ -181,7 +187,8 @@ export class ControllerAnalyzer {
     method: ts.MethodDeclaration,
     basePath: string,
     typeChecker: ts.TypeChecker,
-    schemas: Record<string, SchemaObject | OpenAPIV3.ReferenceObject>
+    schemas: Record<string, SchemaObject | OpenAPIV3.ReferenceObject>,
+    controllerClassName: string
   ): ControllerRoute | null {
     const decorators = ts.getDecorators(method);
     if (!decorators) return null;
@@ -194,10 +201,12 @@ export class ControllerAnalyzer {
     const fullPath = this.buildFullPath(basePath, routePath);
     const apiOperation = this.findDecorator(decorators, 'ApiOperation');
 
+    const operationId = `${controllerClassName}_${method.name?.getText()}`;
+
     const route: ControllerRoute = {
       path: fullPath,
       method: httpMethod.toLowerCase(),
-      operationId: method.name?.getText(),
+      operationId: operationId,
     };
 
     if (apiOperation) {
@@ -247,17 +256,11 @@ export class ControllerAnalyzer {
         const paramSymbol = typeChecker.getSymbolAtLocation(param.name);
         if (paramSymbol) {
           const paramType = typeChecker.getDeclaredTypeOfSymbol(paramSymbol);
-          const typeName = typeChecker.typeToString(paramType);
-
-          if (!schemas[typeName]) {
-            this.generateSchemaForType(paramType, typeChecker, schemas);
-          }
-
           parameters.push({
             name: 'body',
             in: 'body',
             required: true,
-            schema: { $ref: `#/definitions/${typeName}` },
+            schema: this.generateSchemaForType(paramType, typeChecker, schemas),
           });
         }
         return;
@@ -315,13 +318,16 @@ export class ControllerAnalyzer {
                 response.description = initializer.text;
               }
               if (propName === 'type') {
-                const type = typeChecker.getTypeAtLocation(initializer);
-                const typeName = typeChecker.typeToString(type);
-
-                if (!schemas[typeName]) {
-                  this.generateSchemaForType(type, typeChecker, schemas);
+                let type = typeChecker.getTypeAtLocation(initializer);
+                const constructSignatures = type.getConstructSignatures();
+                if (constructSignatures.length > 0) {
+                  type = constructSignatures[0].getReturnType();
                 }
-                response.schema = { $ref: `#/definitions/${typeName}` };
+                response.schema = this.generateSchemaForType(
+                  type,
+                  typeChecker,
+                  schemas
+                );
               }
             }
           }
@@ -346,6 +352,19 @@ export class ControllerAnalyzer {
     typeChecker: ts.TypeChecker,
     schemas: Record<string, SchemaObject | OpenAPIV3.ReferenceObject>
   ): SchemaObject | OpenAPIV3.ReferenceObject {
+    const symbol = type.getSymbol();
+    if (symbol && symbol.getName() === 'Date') {
+      return { type: 'string', format: 'date-time' };
+    }
+
+    const numberIndexType = type.getNumberIndexType();
+    if (numberIndexType) {
+      return {
+        type: 'array',
+        items: this.generateSchemaForType(numberIndexType, typeChecker, schemas),
+      };
+    }
+
     const typeName = typeChecker.typeToString(type);
 
     if (schemas[typeName]) {
@@ -360,7 +379,6 @@ export class ControllerAnalyzer {
     for (const property of type.getProperties()) {
       const propertyName = property.name;
 
-      // Asegurarse de que la declaración del valor de la propiedad exista
       if (property.valueDeclaration) {
         const propertyType = typeChecker.getTypeOfSymbolAtLocation(
           property,
@@ -382,14 +400,13 @@ export class ControllerAnalyzer {
         } else if (propertyType.isClassOrInterface()) {
           const nestedTypeName = typeChecker.typeToString(propertyType);
           if (nestedTypeName === typeName) {
-            // Self-reference
             properties[propertyName] = { $ref: `#/definitions/${nestedTypeName}` };
           } else {
             properties[propertyName] =
               this.generateSchemaForType(propertyType, typeChecker, schemas) || {};
           }
-        } else if (typeChecker.isArrayType(propertyType)) {
-          const arrayType = (propertyType as ts.TypeReference).typeArguments?.[0];
+        } else if (type.getNumberIndexType()) {
+          const arrayType = type.getNumberIndexType();
           if (arrayType) {
             properties[propertyName] = {
               type: 'array',

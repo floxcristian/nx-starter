@@ -4,13 +4,14 @@
  * Se encarga de generar documentos OpenAPI, combinar múltiples servicios y convertir el formato final.
  */
 
-import { OpenAPIV3 } from 'openapi-types';
+import type { OpenAPI, OpenAPIV3 } from 'openapi-types';
 import { SwaggerV2Document } from '../types/index';
 import * as Converter from 'api-spec-converter';
 import {
   NxBasedOpenApiGenerator,
   OpenApiSpec,
 } from './nx-workspace-discovery';
+import SwaggerParser from '@apidevtools/swagger-parser';
 
 // Interfaces locales para el resultado de la conversión
 interface ConversionError {
@@ -126,6 +127,21 @@ export async function convertToSwagger2(
     }
 
     console.log('✅ Conversión completada exitosamente');
+
+    // --- NUEVA LÓGICA DE VALIDACIÓN ---
+    console.log('🔍 Validando especificación Swagger 2.0 generada...');
+    try {
+      // SwaggerParser.validate() puede tomar un objeto directamente
+      await SwaggerParser.validate(result.spec as OpenAPI.Document);
+      console.log('✅ Validación Swagger 2.0 exitosa.');
+    } catch (validationError) {
+      console.error('❌ Error de validación Swagger 2.0:', validationError);
+      throw new Error(
+        `La especificación Swagger 2.0 generada no es válida: ${validationError}`
+      );
+    }
+    // --- FIN NUEVA LÓGICA DE VALIDACIÓN --- 
+
     return result.spec;
   } catch (error) {
     console.error(
@@ -134,4 +150,29 @@ export async function convertToSwagger2(
     );
     throw error;
   }
+}
+
+/**
+ * Añade un esquema de seguridad JWT al documento OpenAPI.
+ *
+ * @param document El documento OpenAPI a modificar.
+ * @returns El documento OpenAPI con el esquema de seguridad añadido.
+ */
+export function addJwtSecurityScheme(
+  document: OpenAPIV3.Document
+): OpenAPIV3.Document {
+  if (!document.components) {
+    document.components = {};
+  }
+  if (!document.components.securitySchemes) {
+    document.components.securitySchemes = {};
+  }
+
+  document.components.securitySchemes['firebase-auth'] = {
+    type: 'http',
+    scheme: 'bearer',
+    bearerFormat: 'JWT',
+  };
+
+  return document;
 }
