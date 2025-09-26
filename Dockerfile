@@ -34,7 +34,7 @@ ENV NX_DAEMON=false
 
 # Copia el archivo de config de docker y lo renombra a .npmrc dentro del build
 COPY .npmrc.docker .npmrc
-# Copia los archivos de manifiesto y el .npmrc (clave para el caché)
+# Copia los archivos de manifiesto
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 
 # Usa --mount=type=cache para una instalación de dependencias ultra rápida.
@@ -42,9 +42,6 @@ COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 # los paquetes nuevos o modificados.
 RUN --mount=type=cache,id=pnpm,target=/root/.pnpm-store \
     pnpm install --frozen-lockfile
-
-# Copia todo el código fuente del monorepo
-#COPY . .
 
 # Copiar archivos de configuración de TypeScript y Nx
 COPY nx.json tsconfig.base.json ./
